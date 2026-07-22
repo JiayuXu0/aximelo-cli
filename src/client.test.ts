@@ -56,7 +56,7 @@ describe("QuoteClient", () => {
             status: "queued",
             file_name: "part.stp",
             quantity: 3,
-            material: "AL6061",
+            material: "6061",
             process: "cnc-machining",
             price_options: [],
             requested_at: "2026-07-22T12:00:00Z",
@@ -73,7 +73,7 @@ describe("QuoteClient", () => {
     await expect(
       client.submit({
         filePath: file,
-        material: "AL6061",
+        material: "6061",
         process: "cnc-machining",
         quantity: 3,
       }),
@@ -88,7 +88,7 @@ describe("QuoteClient", () => {
       file_name: "part.stp",
       file_size: Buffer.byteLength(content),
       checksum: `sha256:${createHash("sha256").update(content).digest("hex")}`,
-      material: "AL6061",
+      material: "6061",
       process: "cnc-machining",
       quantity: 3,
     });

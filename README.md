@@ -6,7 +6,7 @@
 npm install -g @yoxiang/quote-cli@next
 yoxiang install --agent codex
 yoxiang quote options
-yoxiang quote submit ./part.step --material AL6061 --process cnc-machining --quantity 10 --wait
+yoxiang quote submit ./part.step --material 6061 --process cnc-machining --quantity 10 --wait
 ```
 
 完整安装资料：<https://test.yoxiang.cn/open/quote-cli/installation.md>

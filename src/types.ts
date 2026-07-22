@@ -39,15 +39,6 @@ export interface DfmResult {
   warnings: string[];
   suggestions: string[];
   required_manual_review: boolean;
-  checks: Array<{
-    code: string;
-    category?: string;
-    level?: string;
-    status?: string;
-    message_cn?: string;
-    message_en?: string;
-    blocking: boolean;
-  }>;
 }
 
 export interface QuoteResult {

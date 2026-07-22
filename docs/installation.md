@@ -53,7 +53,7 @@ yoxiang quote options
 
 ```bash
 yoxiang quote submit ./part.step \
-  --material AL6061 \
+  --material 6061 \
   --process cnc-machining \
   --quantity 10 \
   --wait
@@ -103,7 +103,7 @@ yoxiang quote options
 Submit a quote with:
 
 ```bash
-yoxiang quote submit ./part.step --material AL6061 --process cnc-machining --quantity 10 --wait
+yoxiang quote submit ./part.step --material 6061 --process cnc-machining --quantity 10 --wait
 ```
 
 The Agent must ask for missing material, process, or quantity. It may upload only the file you explicitly identify and must not scan nearby directories.
