@@ -25,6 +25,29 @@ yoxiang --version
 yoxiang doctor
 ```
 
+## 更新 CLI 与 Skill
+
+更新测试渠道的 CLI，并同时刷新 Codex Skill：
+
+```bash
+yoxiang update --agent codex
+```
+
+只检查是否有新版本，不执行安装：
+
+```bash
+yoxiang update --check --json
+```
+
+Claude Code 使用 `--agent claude`，两者一起刷新使用 `--agent all`。正式稳定版发布后可以使用 `--channel latest`；当前测试版默认使用 `next`。旧版 CLI 如果还没有 `update` 命令，执行一次兼容更新：
+
+```bash
+npm install -g @yoxiang/quote-cli@next
+yoxiang install --agent codex
+```
+
+正常报价不会自动检查更新，避免增加一次网络请求和 Agent 迭代。
+
 如果暂时不能全局安装，可使用：
 
 ```bash
@@ -65,6 +88,7 @@ yoxiang quote options --help
 yoxiang quote status --help
 yoxiang doctor --help
 yoxiang install --help
+yoxiang update --help
 ```
 
 Help 不访问网络、不读取模型、不执行安装。退出码：`0` 成功/帮助，`2` 无法自动报价，`3` 处理中/超时，`4` 参数或文件错误，`5` 网络、服务端或分析失败。

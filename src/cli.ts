@@ -14,6 +14,7 @@ import {
 } from "./client.js";
 import { CLI_VERSION, HELP, resolveHelp } from "./help.js";
 import type { BatchQuoteResult, QuoteOptions, QuoteResult } from "./types.js";
+import { checkForUpdate, installGlobalUpdate, type UpdateChannel } from "./update.js";
 
 const rawArgs = process.argv.slice(2);
 const helpTopic = resolveHelp(rawArgs);
@@ -47,6 +48,49 @@ async function run(inputArgs: string[]): Promise<void> {
       assertNoExtraArgs(args, "yoxiang install --help");
       const paths = await installSkill(agent);
       emit(json, { ok: true, installed: paths }, `Skill 已安装：\n${paths.map((path) => `- ${path}`).join("\n")}`);
+      return;
+    }
+
+    if (command === "update") {
+      const checkOnly = takeFlag(args, "--check");
+      const channel = takeOption(args, "--channel") ?? "next";
+      const agent = takeOption(args, "--agent") ?? "codex";
+      if (!isUpdateChannel(channel)) {
+        throw new CliError("--channel 仅支持 next 或 latest。请运行 yoxiang update --help。", 4);
+      }
+      if (!isAgent(agent)) {
+        throw new CliError("--agent 仅支持 codex、claude 或 all。请运行 yoxiang update --help。", 4);
+      }
+      assertNoExtraArgs(args, "yoxiang update --help");
+      try {
+        const check = await checkForUpdate(CLI_VERSION, channel);
+        if (checkOnly) {
+          emit(json, { ok: true, update: check }, formatUpdateCheck(check));
+          return;
+        }
+        if (!check.update_available) {
+          const paths = await installSkill(agent);
+          emit(
+            json,
+            { ok: true, updated: false, update: check, skill_refreshed: paths },
+            `${formatUpdateCheck(check)}\nSkill 已刷新：\n${paths.map((path) => `- ${path}`).join("\n")}`,
+          );
+          return;
+        }
+        process.stderr.write(`正在更新有象报价 CLI 到 ${check.target_version}，并刷新 Skill…\n`);
+        const version = await installGlobalUpdate(channel, agent);
+        emit(
+          json,
+          { ok: true, updated: true, previous_version: CLI_VERSION, version, channel, agent },
+          `有象报价 CLI 已更新：${CLI_VERSION} -> ${version}\n${agent} Skill 已刷新。`,
+        );
+      } catch (error) {
+        throw new CliError(
+          `CLI 更新失败。请手动运行 npm install -g @yoxiang/quote-cli@${channel}，再运行 yoxiang install --agent ${agent}。`,
+          5,
+          error,
+        );
+      }
       return;
     }
 
@@ -188,6 +232,10 @@ function isAgent(value: string): value is "codex" | "claude" | "all" {
   return value === "codex" || value === "claude" || value === "all";
 }
 
+function isUpdateChannel(value: string): value is UpdateChannel {
+  return value === "next" || value === "latest";
+}
+
 function isBatchResult(result: BatchQuoteResult | QuoteResult): result is BatchQuoteResult {
   return "batch_id" in result;
 }
@@ -203,6 +251,25 @@ async function installSkill(agent: "codex" | "claude" | "all"): Promise<string[]
     await cp(source, target, { recursive: true, force: true });
   }
   return targets;
+}
+
+function formatUpdateCheck(check: {
+  channel: UpdateChannel;
+  current_ahead: boolean;
+  current_version: string;
+  target_version: string;
+  update_available: boolean;
+}): string {
+  const status = check.update_available
+    ? "发现可用更新"
+    : check.current_ahead
+      ? "当前版本高于发布渠道"
+      : "当前已是最新版本";
+  return [
+    status,
+    `当前版本：${check.current_version}`,
+    `${check.channel} 版本：${check.target_version}`,
+  ].join("\n");
 }
 
 function formatDoctor(options: QuoteOptions, apiBase: string): string {

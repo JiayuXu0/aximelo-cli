@@ -1,6 +1,6 @@
 ---
 name: yoxiang-part-quote
-description: Quote one or more explicitly provided STEP/STP manufacturing parts with Yoxiang. Use for price, lead time, machining time, DFM, geometry, or 3D-view requests. Defaults to 6061 aluminum, CNC, quantity 1, standard finish, ISO 2768-m, and Ra 3.2.
+description: Quote one or more explicitly provided STEP/STP manufacturing parts with Yoxiang, or install, check, update, and repair the Yoxiang quote CLI and Skill. Use for price, lead time, machining time, DFM, geometry, 3D-view, CLI installation, or CLI/Skill update requests. Defaults to 6061 aluminum, CNC, quantity 1, standard finish, ISO 2768-m, and Ra 3.2.
 ---
 
 # Yoxiang Part Quote
@@ -44,6 +44,25 @@ Do not ask for manufacturing parameters when the user omits them. Use:
 3. Do not run `doctor` first. Run `yoxiang doctor --json` only after installation or connection failure.
 4. Do not run `quote options` for defaults. Run it only when an explicit non-default value cannot be mapped to a supported code.
 5. Ask one combined question only when paths are missing/ambiguous, a file is unsupported/oversized, or different parts require different parameters.
+
+## Update and repair
+
+- Do not check for or install updates before a normal quote.
+- When the user explicitly asks to update the CLI or Skill, run once:
+
+  ```bash
+  yoxiang update --agent codex --json
+  ```
+
+- Use `--agent claude` or `--agent all` only when the user names that target.
+- If an older CLI reports that `update` is unknown, run the fallback once:
+
+  ```bash
+  npm install -g @yoxiang/quote-cli@next && yoxiang install --agent codex
+  ```
+
+- If a quote fails specifically because the installed CLI is incompatible or too old, update once and retry the original quote once. Do not enter an update loop.
+- `yoxiang update --check --json` only checks the configured release channel. Use it only when the user asks whether an update is available.
 
 ## Response
 

@@ -7,6 +7,7 @@ npm install -g @yoxiang/quote-cli@next
 yoxiang install --agent codex
 yoxiang quote ./a.step ./b.step --wait --json
 yoxiang help quote
+yoxiang update --agent codex
 ```
 
 完整安装资料：<https://test.yoxiang.cn/open/quote-cli/installation.md>

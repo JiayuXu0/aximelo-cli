@@ -17,6 +17,8 @@ const helpCommands = [
   ["quote", "status", "--help"],
   ["doctor", "--help"],
   ["install", "--help"],
+  ["help", "update"],
+  ["update", "--help"],
 ];
 
 describe("CLI help integration", () => {

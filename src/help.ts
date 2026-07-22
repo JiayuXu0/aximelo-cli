@@ -21,10 +21,12 @@ export const HELP = {
   yoxiang quote status <batch-id> [--wait] [--json]
   yoxiang doctor
   yoxiang install --agent codex|claude|all
+  yoxiang update [--check] [--channel next|latest] [--agent codex|claude|all]
 
 示例：
   yoxiang quote "./part.step" --wait
   yoxiang quote "./a.step" "./b.step" --wait --json
+  yoxiang update --check
   yoxiang help quote
 
 全局参数：
@@ -95,6 +97,23 @@ doctor 只建议在安装完成后验证，或连接失败时排障。`,
 示例：
   yoxiang install --agent codex
   yoxiang install --agent all`,
+  update: `检查或更新有象报价 CLI，并刷新对应 Agent 的 yoxiang-part-quote Skill。
+
+用法：
+  yoxiang update [--check] [--channel next|latest] [--agent codex|claude|all] [--json]
+
+示例：
+  yoxiang update --check
+  yoxiang update --agent codex
+  yoxiang update --channel latest --agent all --json
+
+参数：
+  --check             只检查版本，不安装或写入文件
+  --channel <tag>     更新渠道，默认 next；稳定版使用 latest
+  --agent <agent>     更新后刷新的 Skill，默认 codex
+  --json              stdout 只输出一个最终 JSON；进度写入 stderr
+
+update 不读取或上传 STEP/STP 文件，也不访问报价 API。`,
 } as const;
 
 export type HelpTopic = keyof typeof HELP;
@@ -115,5 +134,6 @@ function topicFromTokens(tokens: string[]): HelpTopic {
   }
   if (tokens[0] === "doctor") return "doctor";
   if (tokens[0] === "install") return "install";
+  if (tokens[0] === "update") return "update";
   return "root";
 }
