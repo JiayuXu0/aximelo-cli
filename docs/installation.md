@@ -21,7 +21,11 @@ yoxiang doctor
 
 ```bash
 npx --yes github:JiayuXu0/yoxiang-quote-cli doctor
+npx --yes github:JiayuXu0/yoxiang-quote-cli install --agent codex
+npx --yes github:JiayuXu0/yoxiang-quote-cli quote options
 ```
+
+后续报价命令也可以把开头的 `yoxiang` 替换为 `npx --yes github:JiayuXu0/yoxiang-quote-cli`。
 
 ## 安装 Agent Skill
 
