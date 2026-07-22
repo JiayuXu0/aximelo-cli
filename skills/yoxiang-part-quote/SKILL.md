@@ -24,12 +24,13 @@ Do not ask for manufacturing parameters when the user omits them. Use:
 - Never search, glob, recurse, list, or scan directories for models.
 - Never add adjacent files, drawings, assemblies, or archives.
 - Each file must be `.step` or `.stp` and no larger than 10 MiB (10,485,760 bytes).
+- Quote at most five parts concurrently. Daily quote count is currently unlimited; for more than five explicit files, submit sequential groups of at most five and never fan out parallel CLI processes.
 - Never call ERP/debug endpoints or expose costs, algorithms, traces, storage paths, or internal rules.
 - Treat results as test estimates, not orders or binding offers.
 
 ## Workflow
 
-1. If all exact file paths are clear, run exactly once:
+1. If up to five exact file paths are clear, run exactly once:
 
    ```bash
    yoxiang quote "/exact/path/a.step" "/exact/path/b.step" --wait --json

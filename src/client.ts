@@ -13,6 +13,7 @@ import type {
 export const DEFAULT_API_BASE_URL = "https://quote-test-api.yoxiang.cn";
 export const DEFAULT_RESULT_BASE_URL = "https://test.yoxiang.cn";
 export const MAX_FILE_BYTES = 10_485_760;
+export const MAX_CONCURRENT_PARTS = 5;
 
 export const DEFAULT_QUOTE_INPUT = {
   material: "6061",
@@ -120,7 +121,7 @@ export class QuoteClient {
     if (intent.items.length !== files.length) {
       throw new CliError("报价服务返回的上传地址数量与文件数量不一致。", 5);
     }
-    await mapWithConcurrency(files, 2, async (file, index) => {
+    await mapWithConcurrency(files, MAX_CONCURRENT_PARTS, async (file, index) => {
       await this.upload(file.path, intent.items[index]!);
     });
     const result = await this.request<BatchQuoteResult>(
@@ -238,6 +239,9 @@ export async function inspectFile(filePath: string): Promise<InspectedFile> {
 
 export async function inspectFiles(filePaths: string[]): Promise<InspectedFile[]> {
   if (filePaths.length === 0) throw new CliError("请至少明确指定一个 STEP/STP 文件。", 4);
+  if (filePaths.length > MAX_CONCURRENT_PARTS) {
+    throw new CliError(`一个批次最多同时报价 ${MAX_CONCURRENT_PARTS} 个零件，请分批顺序提交。`, 4);
+  }
   const files = await Promise.all(filePaths.map(inspectFile));
   const seen = new Set<string>();
   for (const file of files) {

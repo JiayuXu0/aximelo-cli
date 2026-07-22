@@ -3,7 +3,14 @@ import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { CliError, inspectFile, inspectFiles, MAX_FILE_BYTES, QuoteClient } from "./client.js";
+import {
+  CliError,
+  inspectFile,
+  inspectFiles,
+  MAX_CONCURRENT_PARTS,
+  MAX_FILE_BYTES,
+  QuoteClient,
+} from "./client.js";
 
 describe("inspectFile", () => {
   it("hashes an explicitly named STEP file", async () => {
@@ -44,6 +51,15 @@ describe("inspectFile", () => {
     await symlink(nested, link);
     await expect(inspectFile(join(directory, "folder.step"))).rejects.toMatchObject({ exitCode: 4 });
     await expect(inspectFiles([nested, link])).rejects.toMatchObject({ exitCode: 4 });
+  });
+
+  it("rejects more than five parts before reading files", async () => {
+    await expect(
+      inspectFiles(Array.from({ length: MAX_CONCURRENT_PARTS + 1 }, (_, index) => `missing-${index}.step`)),
+    ).rejects.toMatchObject({
+      exitCode: 4,
+      message: expect.stringContaining("最多同时报价 5 个零件"),
+    });
   });
 });
 
@@ -161,6 +177,54 @@ describe("QuoteClient", () => {
     await writeFile(tooLarge, Buffer.alloc(MAX_FILE_BYTES + 1));
     await expect(invalidClient.submitBatch({ filePaths: [first, tooLarge] })).rejects.toMatchObject({ exitCode: 4 });
     expect(invalidFetch).not.toHaveBeenCalled();
+  });
+
+  it("uploads a five-part batch with five concurrent upload workers", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "yoxiang-cli-five-part-batch-"));
+    const files = await Promise.all(
+      Array.from({ length: MAX_CONCURRENT_PARTS }, async (_, index) => {
+        const file = join(directory, `part-${index + 1}.step`);
+        await writeFile(file, `ISO-10303-21;part-${index + 1}`);
+        return file;
+      }),
+    );
+    let activeUploads = 0;
+    let maximumActiveUploads = 0;
+    const fetchImpl = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/v1/public/part-quote-batches")) {
+        return jsonResponse(
+          {
+            batch_id: "b-five",
+            status: "awaiting_upload",
+            result_path: "/tools/quote-cli/results/b-five",
+            items: files.map((file, index) => uploadIntent(`q-${index + 1}`, file)),
+          },
+          201,
+        );
+      }
+      if (url.includes("upload.example.test")) {
+        activeUploads += 1;
+        maximumActiveUploads = Math.max(maximumActiveUploads, activeUploads);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        activeUploads -= 1;
+        return new Response(null, { status: 200 });
+      }
+      return jsonResponse(
+        {
+          batch_id: "b-five",
+          status: "processing",
+          result_path: "/tools/quote-cli/results/b-five",
+          items: [],
+        },
+        202,
+      );
+    });
+    const client = new QuoteClient({ baseUrl: "https://api.example.test", fetchImpl });
+
+    await client.submitBatch({ filePaths: files });
+
+    expect(maximumActiveUploads).toBe(MAX_CONCURRENT_PARTS);
   });
 
   it("polls until a terminal result", async () => {

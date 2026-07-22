@@ -9,7 +9,7 @@
 - Node.js 20 或更高版本，支持 macOS、Linux、Windows
 - 每个 `.step` / `.stp` 文件最大 10 MiB（10,485,760 bytes）
 - 默认：6061 铝、CNC、数量 1、标准表面处理、ISO 2768-m、Ra 3.2
-- 每个 IP 每小时最多 10 个零件，同时最多处理 2 个零件
+- 当前不限制每天报价次数；同一 IP 同时最多处理 5 个零件
 
 ## 安装
 
@@ -72,7 +72,7 @@ yoxiang quote "./left.step" "./right.stp" --wait --json
 yoxiang quote "./part.step" --material 7075 --quantity 5 --wait
 ```
 
-CLI 会先校验整批路径、扩展名和大小；任一文件不合法时整批不上传。它不接受目录、glob，也不会扫描相邻文件。最多并行上传两个文件。
+CLI 会先校验整批路径、扩展名和大小；任一文件不合法时整批不上传。它不接受目录、glob，也不会扫描相邻文件。每批最多并行上传 5 个文件；超过 5 个时按最多 5 个一组顺序提交。
 
 Agent 推荐使用 `--json`：stdout 只输出一个最终 JSON，进度写入 stderr。输出包含一个 7 天结果链接，可集中查看各零件报价、加工阶段时间、DFM、WebP 缩略图和 HOOPS 3D 模型；预览失败不影响价格结果。
 
@@ -118,4 +118,4 @@ yoxiang install --agent codex
 yoxiang quote "./a.step" "./b.step" --wait --json
 ```
 
-Defaults are 6061 aluminum, CNC, quantity 1, standard finish, ISO 2768-m, and Ra 3.2. Each explicitly named STEP/STP file must be at most 10 MiB. The CLI validates the complete batch before any upload and returns three price tiers, machining time, public DFM, and a seven-day 3D result link.
+Defaults are 6061 aluminum, CNC, quantity 1, standard finish, ISO 2768-m, and Ra 3.2. Each explicitly named STEP/STP file must be at most 10 MiB. Daily quote count is currently unlimited, with at most five parts per concurrent batch. The CLI validates the complete batch before any upload and returns three price tiers, machining time, public DFM, and a seven-day 3D result link.
