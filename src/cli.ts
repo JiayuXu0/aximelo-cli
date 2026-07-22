@@ -4,133 +4,156 @@ import { cp, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CliError, DEFAULT_API_BASE_URL, QuoteClient } from "./client.js";
-import type { QuoteOptions, QuoteResult } from "./types.js";
+import {
+  CliError,
+  DEFAULT_API_BASE_URL,
+  DEFAULT_RESULT_BASE_URL,
+  isBatchTerminal,
+  isQuoteTerminal,
+  QuoteClient,
+} from "./client.js";
+import { CLI_VERSION, HELP, resolveHelp } from "./help.js";
+import type { BatchQuoteResult, QuoteOptions, QuoteResult } from "./types.js";
 
-const args = process.argv.slice(2);
-const json = takeFlag(args, "--json");
-const apiBase =
-  takeOption(args, "--api-base") ??
-  process.env.YOXIANG_API_BASE_URL ??
-  DEFAULT_API_BASE_URL;
-const client = new QuoteClient({ baseUrl: apiBase });
+const rawArgs = process.argv.slice(2);
+const helpTopic = resolveHelp(rawArgs);
+if (helpTopic) {
+  process.stdout.write(`${HELP[helpTopic]}\n`);
+} else if (rawArgs.includes("--version")) {
+  process.stdout.write(`${CLI_VERSION}\n`);
+} else {
+  await run(rawArgs);
+}
 
-main(args).catch((error: unknown) => {
-  const cliError =
-    error instanceof CliError
-      ? error
-      : new CliError("命令执行失败。", 5, error);
-  if (json) {
-    process.stdout.write(
-      `${JSON.stringify({ ok: false, error: { message: cliError.message, details: cliError.details } })}\n`,
-    );
-  } else {
-    process.stderr.write(`错误：${cliError.message}\n`);
-  }
-  process.exitCode = cliError.exitCode;
-});
+async function run(inputArgs: string[]): Promise<void> {
+  const args = [...inputArgs];
+  const json = takeFlag(args, "--json");
+  try {
+    const apiBase = takeOption(args, "--api-base") ?? process.env.YOXIANG_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+    const resultBase = process.env.YOXIANG_RESULT_BASE_URL ?? DEFAULT_RESULT_BASE_URL;
+    const client = new QuoteClient({ baseUrl: apiBase, resultBaseUrl: resultBase });
+    const command = args.shift();
 
-async function main(argv: string[]): Promise<void> {
-  const command = argv.shift();
-  if (
-    !command ||
-    command === "help" ||
-    command === "--help" ||
-    command === "-h"
-  ) {
-    printHelp();
-    return;
-  }
-
-  if (command === "doctor") {
-    const options = await client.options();
-    emit(
-      { ok: true, api_base_url: apiBase, service: "reachable", options },
-      formatDoctor(options),
-    );
-    return;
-  }
-
-  if (command === "install") {
-    const agent = takeOption(argv, "--agent") ?? "codex";
-    if (!isAgent(agent))
-      throw new CliError("--agent 仅支持 codex、claude 或 all。", 4);
-    const paths = await installSkill(agent);
-    emit(
-      { ok: true, installed: paths },
-      `Skill 已安装：\n${paths.map((path) => `- ${path}`).join("\n")}`,
-    );
-    return;
-  }
-
-  if (command !== "quote") throw new CliError(`未知命令：${command}`, 4);
-  const subcommand = argv.shift();
-
-  if (subcommand === "options") {
-    const options = await client.options();
-    emit({ ok: true, options }, formatOptions(options));
-    return;
-  }
-
-  if (subcommand === "submit") {
-    const filePath = argv.shift();
-    const material = takeOption(argv, "--material");
-    const processName = takeOption(argv, "--process");
-    const rawQuantity = takeOption(argv, "--quantity");
-    const wait = takeFlag(argv, "--wait");
-    if (!filePath || !material || !processName || !rawQuantity) {
-      throw new CliError(
-        "submit 需要文件、--material、--process 和 --quantity。",
-        4,
-      );
+    if (command === "doctor") {
+      assertNoExtraArgs(args, "yoxiang doctor --help");
+      const options = await client.options();
+      emit(json, { ok: true, api_base_url: apiBase, service: "reachable", options }, formatDoctor(options, apiBase));
+      return;
     }
-    const quantity = Number(rawQuantity);
-    if (!Number.isInteger(quantity) || quantity <= 0)
-      throw new CliError("--quantity 必须是正整数。", 4);
-    assertNoExtraArgs(argv);
-    if (!json) process.stderr.write("正在上传并提交零件…\n");
-    let result = await client.submit({
-      filePath,
+
+    if (command === "install") {
+      const agent = takeOption(args, "--agent") ?? "codex";
+      if (!isAgent(agent)) throw new CliError("--agent 仅支持 codex、claude 或 all。请运行 yoxiang install --help。", 4);
+      assertNoExtraArgs(args, "yoxiang install --help");
+      const paths = await installSkill(agent);
+      emit(json, { ok: true, installed: paths }, `Skill 已安装：\n${paths.map((path) => `- ${path}`).join("\n")}`);
+      return;
+    }
+
+    if (command !== "quote") throw new CliError(`未知命令：${command ?? ""}。请运行 yoxiang --help。`, 4);
+    const first = args[0];
+    if (first === "options") {
+      args.shift();
+      assertNoExtraArgs(args, "yoxiang quote options --help");
+      const options = await client.options();
+      emit(json, { ok: true, options }, formatOptions(options));
+      return;
+    }
+    if (first === "status") {
+      args.shift();
+      const id = args.shift();
+      const wait = takeFlag(args, "--wait");
+      if (!id) throw new CliError("status 需要 batch-id 或兼容的 quote-id。请运行 yoxiang quote status --help。", 4);
+      assertNoExtraArgs(args, "yoxiang quote status --help");
+      const result = await statusAny(client, id, wait, json);
+      if (isBatchResult(result)) emitBatchResult(json, result);
+      else emitQuoteResult(json, result);
+      return;
+    }
+
+    if (first === "submit") args.shift();
+    const material = takeOption(args, "--material");
+    const processName = takeOption(args, "--process");
+    const quantity = positiveIntegerOption(takeOption(args, "--quantity"), "--quantity");
+    const surfaceFinish = takeOption(args, "--surface-finish");
+    const tolerance = takeOption(args, "--tolerance");
+    const surfaceRoughness = takeOption(args, "--surface-roughness");
+    const wait = takeFlag(args, "--wait");
+    if (args.some((arg) => arg.startsWith("-"))) {
+      throw new CliError(`无法识别参数：${args.filter((arg) => arg.startsWith("-")).join(" ")}。请运行 yoxiang quote --help。`, 4);
+    }
+    if (args.length === 0) throw new CliError("quote 需要至少一个明确的 STEP/STP 文件路径。请运行 yoxiang quote --help。", 4);
+
+    process.stderr.write(`正在校验并提交 ${args.length} 个零件…\n`);
+    let result = await client.submitBatch({
+      filePaths: args,
       material,
       process: processName,
       quantity,
+      surfaceFinish,
+      tolerance,
+      surfaceRoughness,
     });
-    if (wait && !isTerminal(result.status)) {
-      if (!json)
-        process.stderr.write(`任务 ${result.quote_id} 已排队，等待分析…\n`);
-      result = await client.wait(result.quote_id);
+    if (wait && !isBatchTerminal(result.status)) {
+      process.stderr.write(`批次 ${result.batch_id} 已提交，等待分析…\n`);
+      let previous = "";
+      result = await client.waitBatch(result.batch_id, 10 * 60_000, (current) => {
+        if (current.status !== previous) {
+          process.stderr.write(`当前状态：${current.status}\n`);
+          previous = current.status;
+        }
+      });
     }
-    emitResult(result);
-    return;
+    emitBatchResult(json, result);
+  } catch (error: unknown) {
+    const cliError = error instanceof CliError ? error : new CliError("命令执行失败。", 5, error);
+    if (json) {
+      process.stdout.write(`${JSON.stringify({ ok: false, error: { message: cliError.message, details: cliError.details } })}\n`);
+    } else {
+      process.stderr.write(`错误：${cliError.message}\n`);
+    }
+    process.exitCode = cliError.exitCode;
   }
-
-  if (subcommand === "status") {
-    const quoteId = argv.shift();
-    if (!quoteId) throw new CliError("status 需要 quote-id。", 4);
-    const wait = takeFlag(argv, "--wait");
-    assertNoExtraArgs(argv);
-    const result = wait
-      ? await client.wait(quoteId)
-      : await client.status(quoteId);
-    emitResult(result);
-    return;
-  }
-
-  throw new CliError(`未知 quote 子命令：${subcommand ?? ""}`, 4);
 }
 
-function emitResult(result: QuoteResult): void {
-  emit(
-    { ok: result.status === "succeeded", quote: result },
-    formatResult(result),
-  );
+async function statusAny(
+  client: QuoteClient,
+  id: string,
+  wait: boolean,
+  json: boolean,
+): Promise<BatchQuoteResult | QuoteResult> {
+  try {
+    const batch = await client.batchStatus(id);
+    if (wait && !isBatchTerminal(batch.status)) {
+      return client.waitBatch(id, 10 * 60_000, (current) => {
+        if (!json) process.stderr.write(`当前状态：${current.status}\n`);
+      });
+    }
+    return batch;
+  } catch (error) {
+    if (!(error instanceof CliError) || error.exitCode !== 4) throw error;
+    const quote = wait ? await client.wait(id) : await client.status(id);
+    return quote;
+  }
+}
+
+function emitBatchResult(json: boolean, result: BatchQuoteResult): void {
+  const ok = result.status === "succeeded";
+  emit(json, { ok, batch: result }, formatBatchResult(result));
+  const statuses = result.items.map((item) => item.status);
+  if (statuses.some((status) => status === "failed" || status === "expired")) process.exitCode = 5;
+  else if (statuses.some((status) => status === "no_auto_quote")) process.exitCode = 2;
+  else if (!isBatchTerminal(result.status)) process.exitCode = 3;
+}
+
+function emitQuoteResult(json: boolean, result: QuoteResult): void {
+  emit(json, { ok: result.status === "succeeded", quote: result }, formatQuoteResult(result));
   if (result.status === "no_auto_quote") process.exitCode = 2;
-  else if (result.status === "failed" || result.status === "expired")
-    process.exitCode = 5;
-  else if (!isTerminal(result.status)) process.exitCode = 3;
+  else if (result.status === "failed" || result.status === "expired") process.exitCode = 5;
+  else if (!isQuoteTerminal(result.status)) process.exitCode = 3;
 }
 
-function emit(payload: unknown, human: string): void {
+function emit(json: boolean, payload: unknown, human: string): void {
   process.stdout.write(json ? `${JSON.stringify(payload)}\n` : `${human}\n`);
 }
 
@@ -145,34 +168,36 @@ function takeOption(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);
   if (index < 0) return undefined;
   const value = argv[index + 1];
-  if (!value || value.startsWith("--"))
-    throw new CliError(`${name} 缺少值。`, 4);
+  if (!value || value.startsWith("--")) throw new CliError(`${name} 缺少值。`, 4);
   argv.splice(index, 2);
   return value;
 }
 
-function assertNoExtraArgs(argv: string[]): void {
-  if (argv.length > 0) throw new CliError(`无法识别参数：${argv.join(" ")}`, 4);
+function positiveIntegerOption(value: string | undefined, name: string): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) throw new CliError(`${name} 必须是正整数。`, 4);
+  return parsed;
 }
 
-function isTerminal(status: QuoteResult["status"]): boolean {
-  return ["succeeded", "no_auto_quote", "failed", "expired"].includes(status);
+function assertNoExtraArgs(argv: string[], help: string): void {
+  if (argv.length > 0) throw new CliError(`无法识别参数：${argv.join(" ")}。请运行 ${help}。`, 4);
 }
 
 function isAgent(value: string): value is "codex" | "claude" | "all" {
   return value === "codex" || value === "claude" || value === "all";
 }
 
-async function installSkill(
-  agent: "codex" | "claude" | "all",
-): Promise<string[]> {
+function isBatchResult(result: BatchQuoteResult | QuoteResult): result is BatchQuoteResult {
+  return "batch_id" in result;
+}
+
+async function installSkill(agent: "codex" | "claude" | "all"): Promise<string[]> {
   const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
   const source = join(packageRoot, "skills", "yoxiang-part-quote");
   const targets: string[] = [];
-  if (agent === "codex" || agent === "all")
-    targets.push(join(homedir(), ".codex", "skills", "yoxiang-part-quote"));
-  if (agent === "claude" || agent === "all")
-    targets.push(join(homedir(), ".claude", "skills", "yoxiang-part-quote"));
+  if (agent === "codex" || agent === "all") targets.push(join(homedir(), ".codex", "skills", "yoxiang-part-quote"));
+  if (agent === "claude" || agent === "all") targets.push(join(homedir(), ".claude", "skills", "yoxiang-part-quote"));
   for (const target of targets) {
     await mkdir(dirname(target), { recursive: true });
     await cp(source, target, { recursive: true, force: true });
@@ -180,17 +205,19 @@ async function installSkill(
   return targets;
 }
 
-function formatDoctor(options: QuoteOptions): string {
+function formatDoctor(options: QuoteOptions, apiBase: string): string {
   return [
     "有象报价 CLI 状态正常",
     `API：${apiBase}`,
     `支持：${options.supported_extensions.join("、")}`,
-    `文件上限：${Math.round(options.max_file_bytes / 1024 / 1024)} MB`,
+    `单文件上限：${options.max_file_bytes.toLocaleString()} bytes（10 MiB）`,
+    "默认：6061 / CNC / 1 件 / standard / ISO2768-m / Ra3.2",
   ].join("\n");
 }
 
 function formatOptions(options: QuoteOptions): string {
   return [
+    "默认：6061 / cnc-machining / 1 件 / standard / ISO2768-m / Ra3.2",
     "可用材料：",
     ...options.materials.map((item) => `- ${item.value}: ${item.label}`),
     "可用工艺：",
@@ -198,36 +225,49 @@ function formatOptions(options: QuoteOptions): string {
   ].join("\n");
 }
 
-function formatResult(result: QuoteResult): string {
-  const lines = [`报价任务：${result.quote_id}`, `状态：${result.status}`];
-  if (result.price_options.length) {
-    const labels = {
-      economy: "经济",
-      standard: "标准",
-      express: "加急",
-    } as const;
-    lines.push(
-      "价格：",
-      ...result.price_options.map(
-        (price) =>
-          `- ${labels[price.option_type]}：${price.currency} ${(price.total_price_cents / 100).toFixed(2)}，${price.lead_time_days} 天`,
-      ),
-    );
+function formatBatchResult(result: BatchQuoteResult): string {
+  const lines = [
+    `结果链接：${result.result_url ?? result.result_path}`,
+    `批次：${result.batch_id}`,
+    `状态：${result.status}`,
+    "",
+    "报价：",
+  ];
+  for (const item of result.items) {
+    lines.push(`- ${item.file_name}（${item.status}）`);
+    for (const price of item.price_options) lines.push(`  ${priceLabel(price.option_type)}：${price.currency} ${(price.total_price_cents / 100).toFixed(2)}，${price.lead_time_days} 天`);
   }
-  if (result.dfm) {
-    const findings = [
-      ...(result.dfm.warnings ?? []),
-      ...(result.dfm.suggestions ?? []),
-    ];
-    if (findings.length)
-      lines.push("DFM 建议：", ...findings.map((finding) => `- ${finding}`));
+  lines.push("", "加工时间：");
+  for (const item of result.items) {
+    const total = item.machining_time_hours?.total_processing;
+    lines.push(`- ${item.file_name}：${total === undefined ? "分析中或暂无数据" : `${total.toFixed(2)} 小时`}`);
   }
-  if (result.error_code) lines.push(`说明：${result.error_code}`);
+  const findings = result.items.flatMap((item) => publicFindings(item));
+  lines.push("", "DFM / 异常：", ...(findings.length ? findings.map((finding) => `- ${finding}`) : ["- 暂无公开异常"]));
   return lines.join("\n");
 }
 
-function printHelp(): void {
-  process.stdout.write(
-    `有象零件报价 CLI\n\n用法：\n  yoxiang quote options\n  yoxiang quote submit <file.step> --material <code> --process <code> --quantity <n> [--wait] [--json]\n  yoxiang quote status <quote-id> [--wait] [--json]\n  yoxiang doctor\n  yoxiang install --agent codex|claude|all\n\n全局参数：\n  --api-base <url>  覆盖报价 API 地址\n  --json            输出单个 JSON 对象\n`,
-  );
+function formatQuoteResult(result: QuoteResult): string {
+  return formatBatchResult({
+    batch_id: result.quote_id,
+    status: result.status === "succeeded" ? "succeeded" : isQuoteTerminal(result.status) ? "completed_with_errors" : "processing",
+    result_path: "",
+    items: [result],
+    requested_at: result.requested_at,
+    expires_at: result.expires_at,
+  });
+}
+
+function publicFindings(item: QuoteResult): string[] {
+  if (item.error_code) return [`${item.file_name}：${item.error_code}`];
+  const messages = [
+    ...(item.dfm?.findings ?? []).map((finding) => finding.message_cn || finding.message_en || finding.code),
+    ...(item.dfm?.warnings ?? []),
+    ...(item.dfm?.suggestions ?? []),
+  ].filter(Boolean);
+  return [...new Set(messages)].map((message) => `${item.file_name}：${message}`);
+}
+
+function priceLabel(option: "economy" | "standard" | "express"): string {
+  return { economy: "经济", standard: "标准", express: "加急" }[option];
 }

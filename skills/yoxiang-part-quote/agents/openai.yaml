@@ -1,4 +1,4 @@
 interface:
   display_name: "有象零件报价"
-  short_description: "通过 STEP 文件获取三档制造报价与 DFM 建议"
-  default_prompt: "Use $yoxiang-part-quote to quote the STEP file I explicitly provide."
+  short_description: "用默认参数快速获取批量三档报价、加工时间、DFM 与三维结果"
+  default_prompt: "Use $yoxiang-part-quote to quote the explicitly provided STEP files with the default manufacturing parameters."

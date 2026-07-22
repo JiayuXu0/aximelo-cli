@@ -1,12 +1,12 @@
 # @yoxiang/quote-cli
 
-有象成物公开测试零件报价 CLI 与 Agent Skill。它只处理用户明确指定的单个 STEP/STP 文件，并通过公开匿名接口返回三档价格与 DFM 建议。
+有象成物公开测试零件报价 CLI 与 Agent Skill。它只处理用户明确指定、单个不超过 10 MiB 的 STEP/STP 文件，并通过公开匿名接口返回批量三档价格、加工时间、DFM 与 3D 结果链接。
 
 ```bash
 npm install -g @yoxiang/quote-cli@next
 yoxiang install --agent codex
-yoxiang quote options
-yoxiang quote submit ./part.step --material 6061 --process cnc-machining --quantity 10 --wait
+yoxiang quote ./a.step ./b.step --wait --json
+yoxiang help quote
 ```
 
 完整安装资料：<https://test.yoxiang.cn/open/quote-cli/installation.md>

@@ -1,69 +1,57 @@
 ---
 name: yoxiang-part-quote
-description: Use the Yoxiang public quote CLI to quote one STEP or STP manufacturing part. Trigger when a user asks for a part price, manufacturing quote, or DFM review and explicitly provides a STEP/STP file. Always collect material, process, and quantity before submission.
+description: Quote one or more explicitly provided STEP/STP manufacturing parts with Yoxiang. Use for price, lead time, machining time, DFM, geometry, or 3D-view requests. Defaults to 6061 aluminum, CNC, quantity 1, standard finish, ISO 2768-m, and Ra 3.2.
 ---
 
 # Yoxiang Part Quote
 
-Use the `yoxiang` CLI to submit exactly one user-selected STEP/STP file to the public Yoxiang test quote service. Return the public economy, standard, and expedited prices plus public DFM guidance.
+Submit the exact STEP/STP paths named by the user and return the public batch result. Normal quoting is one CLI call.
 
-## Required inputs
+## Defaults
 
-Before uploading anything, confirm all four inputs:
+Do not ask for manufacturing parameters when the user omits them. Use:
 
-1. The exact STEP/STP file selected by the user.
-2. Material code.
-3. Manufacturing process code.
-4. Positive integer quantity.
+- Material: 6061 aluminum
+- Process: CNC
+- Quantity: 1
+- Surface finish: standard
+- Tolerance: ISO 2768-m
+- Surface roughness: Ra 3.2
 
-If material, process, or quantity is missing or ambiguous, ask the user. Never infer or guess these values.
+## Safety
 
-## Safety boundary
-
-- Upload only the exact file path explicitly provided or selected by the user.
-- Never search, glob, recurse through, or scan a directory for models.
-- Never upload adjacent files, assemblies, drawings, or archives without a new explicit request.
-- Never call ERP pricing debug endpoints or try to obtain internal cost, algorithm, fee, trace, or rule data.
-- The public test result is an estimate. Do not represent it as a confirmed order or binding commercial offer.
+- Upload only file paths the user explicitly provided or selected.
+- Never search, glob, recurse, list, or scan directories for models.
+- Never add adjacent files, drawings, assemblies, or archives.
+- Each file must be `.step` or `.stp` and no larger than 10 MiB (10,485,760 bytes).
+- Never call ERP/debug endpoints or expose costs, algorithms, traces, storage paths, or internal rules.
+- Treat results as test estimates, not orders or binding offers.
 
 ## Workflow
 
-1. Verify the CLI and public service:
+1. If all exact file paths are clear, run exactly once:
 
    ```bash
-   yoxiang doctor
+   yoxiang quote "/exact/path/a.step" "/exact/path/b.step" --wait --json
    ```
 
-2. If a material or process code needs confirmation, inspect current choices:
+2. Add flags only when the user explicitly overrides defaults, for example:
 
    ```bash
-   yoxiang quote options --json
+   yoxiang quote "/exact/path/a.step" --material 7075 --quantity 5 --wait --json
    ```
 
-3. Submit the exact user-selected file and wait:
+3. Do not run `doctor` first. Run `yoxiang doctor --json` only after installation or connection failure.
+4. Do not run `quote options` for defaults. Run it only when an explicit non-default value cannot be mapped to a supported code.
+5. Ask one combined question only when paths are missing/ambiguous, a file is unsupported/oversized, or different parts require different parameters.
 
-   ```bash
-   yoxiang quote submit "/exact/path/part.step" \
-     --material "<material-code>" \
-     --process "<process-code>" \
-     --quantity <quantity> \
-     --wait \
-     --json
-   ```
+## Response
 
-4. If the command returns a pending task or times out, continue with:
+Present in this order:
 
-   ```bash
-   yoxiang quote status "<quote-id>" --wait --json
-   ```
+1. Result link for the seven-day batch page and 3D viewer.
+2. A table with each part's economy, standard, and expedited price and lead time.
+3. Total and available stage machining times.
+4. Public DFM findings or failures.
 
-5. Summarize all returned price tiers, currency, lead time, and DFM findings. Preserve the quote ID and expiry time.
-
-## Result handling
-
-- `succeeded`: show economy, standard, and expedited choices and the public DFM findings.
-- `no_auto_quote`: explain that the file was accepted but cannot currently be priced automatically; do not invent a price.
-- `failed`: report the public failure message and offer a retry only when appropriate.
-- `expired`: explain that the seven-day result window ended and ask before resubmitting the same file.
-
-Do not expose or speculate about algorithms, cost breakdowns, internal pricing rules, hidden identifiers, storage locations, or worker traces.
+For `no_auto_quote`, say automatic pricing is unavailable and never invent a price. For partial batches, preserve each part's independent status. Do not claim that a part entered manual review unless the response explicitly says so.
