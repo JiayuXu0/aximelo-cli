@@ -6,11 +6,11 @@ import { execFileSync } from "node:child_process";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const frontendRoot = resolve(process.argv[2] ?? join(repositoryRoot, "..", "poieza-quote-frontend"));
-const outputRoot = join(frontendRoot, "apps", "web", "public", "open", "quote-cli");
+const outputRoot = join(frontendRoot, "apps", "web", "public", "open", "part-analysis-cli");
 const installationSource = join(repositoryRoot, "docs", "installation.md");
-const skillSource = join(repositoryRoot, "skills", "yoxiang-part-quote", "SKILL.md");
+const skillSource = join(repositoryRoot, "skills", "yoxiang-part-analysis", "SKILL.md");
 const installationTarget = join(outputRoot, "installation.md");
-const skillTarget = join(outputRoot, "skills", "yoxiang-part-quote", "SKILL.md");
+const skillTarget = join(outputRoot, "skills", "yoxiang-part-analysis", "SKILL.md");
 
 await mkdir(dirname(skillTarget), { recursive: true });
 await cp(installationSource, installationTarget);
@@ -30,11 +30,11 @@ const manifest = {
   },
   files: {
     "installation.md": { sha256: await sha256(installationTarget) },
-    "skills/yoxiang-part-quote/SKILL.md": { sha256: await sha256(skillTarget) },
+    "skills/yoxiang-part-analysis/SKILL.md": { sha256: await sha256(skillTarget) },
   },
 };
 await writeFile(join(outputRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-process.stdout.write(`Exported quote CLI docs to ${outputRoot}\n`);
+process.stdout.write(`Exported part analysis CLI docs to ${outputRoot}\n`);
 
 async function sha256(path) {
   return createHash("sha256").update(await readFile(path)).digest("hex");

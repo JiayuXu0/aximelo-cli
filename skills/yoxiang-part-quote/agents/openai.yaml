@@ -1,4 +1,0 @@
-interface:
-  display_name: "有象零件报价"
-  short_description: "快速获取批量报价、加工时间、DFM、三维结果并维护 CLI"
-  default_prompt: "Use $yoxiang-part-quote to quote the explicitly provided STEP files or update the Yoxiang CLI when requested."

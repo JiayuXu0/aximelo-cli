@@ -1,7 +1,7 @@
 {
-  "name": "@yoxiang/quote-cli",
-  "version": "0.3.0-next.0",
-  "description": "Public CLI and agent skill for Yoxiang STEP part quotes",
+  "name": "@yoxiang/cli",
+  "version": "0.4.0-next.0",
+  "description": "Public CLI and agent skill for Yoxiang STEP part manufacturing analysis",
   "type": "module",
   "bin": {
     "yoxiang": "dist/cli.js"

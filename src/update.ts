@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export const NPM_PACKAGE = "@yoxiang/quote-cli";
+export const NPM_PACKAGE = "@yoxiang/cli";
 export const NPM_REGISTRY = "https://registry.npmjs.org";
 
 export type UpdateAgent = "codex" | "claude" | "all";
@@ -23,7 +23,7 @@ export async function checkForUpdate(
   channel: UpdateChannel,
   registry = NPM_REGISTRY,
 ): Promise<UpdateCheck> {
-  const response = await fetch(`${registry.replace(/\/$/, "")}/@yoxiang%2Fquote-cli`, {
+  const response = await fetch(`${registry.replace(/\/$/, "")}/@yoxiang%2Fcli`, {
     headers: { accept: "application/vnd.npm.install-v1+json" },
   });
   if (!response.ok) throw new Error(`npm registry returned HTTP ${response.status}`);
@@ -54,7 +54,7 @@ export async function installGlobalUpdate(
   const { stdout: globalRootOutput } = await execFileAsync(npm, ["root", "--global"], {
     maxBuffer: 1024 * 1024,
   });
-  const updatedCLI = join(globalRootOutput.trim(), "@yoxiang", "quote-cli", "dist", "cli.js");
+  const updatedCLI = join(globalRootOutput.trim(), "@yoxiang", "cli", "dist", "cli.js");
   const { stdout: versionOutput } = await execFileAsync(process.execPath, [updatedCLI, "--version"], {
     maxBuffer: 1024 * 1024,
   });

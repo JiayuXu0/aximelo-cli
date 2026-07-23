@@ -52,9 +52,9 @@ describe("CLI version comparison", () => {
     const globalRoot = join(root, "global");
     const invocationLog = join(root, "updated-cli.log");
     const npmLog = join(root, "npm.log");
-    const updatedCLI = join(globalRoot, "@yoxiang", "quote-cli", "dist", "cli.js");
+    const updatedCLI = join(globalRoot, "@yoxiang", "cli", "dist", "cli.js");
     await mkdir(bin, { recursive: true });
-    await mkdir(join(globalRoot, "@yoxiang", "quote-cli", "dist"), { recursive: true });
+    await mkdir(join(globalRoot, "@yoxiang", "cli", "dist"), { recursive: true });
     await writeFile(
       join(bin, "npm"),
       `#!/bin/sh\nprintf '%s\\n' "$*" >> ${JSON.stringify(npmLog)}\nif [ "$1" = "root" ]; then printf '%s\\n' ${JSON.stringify(globalRoot)}; fi\n`,
@@ -73,7 +73,7 @@ describe("CLI version comparison", () => {
         "0.2.0-next.1",
       );
       expect(await readFile(npmLog, "utf8")).toContain(
-        "install --global @yoxiang/quote-cli@next --registry=https://registry.example",
+        "install --global @yoxiang/cli@next --registry=https://registry.example",
       );
       expect(await readFile(invocationLog, "utf8")).toContain("install --agent codex --json");
     } finally {

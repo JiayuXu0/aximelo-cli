@@ -3,11 +3,9 @@ import { createReadStream } from "node:fs";
 import { open, realpath, stat } from "node:fs/promises";
 import { basename, extname } from "node:path";
 import type {
-  BatchQuoteResult,
-  BatchUploadIntent,
-  QuoteOptions,
-  QuoteResult,
-  UploadIntent,
+  AnalysisBatchResult,
+  AnalysisBatchUploadIntent,
+  AnalysisOptions,
 } from "./types.js";
 
 export const DEFAULT_API_BASE_URL = "https://quote-test-api.yoxiang.cn";
@@ -15,11 +13,9 @@ export const DEFAULT_RESULT_BASE_URL = "https://test.yoxiang.cn";
 export const MAX_FILE_BYTES = 10_485_760;
 export const MAX_CONCURRENT_PARTS = 5;
 
-export const DEFAULT_QUOTE_INPUT = {
+export const DEFAULT_ANALYSIS_INPUT = {
   material: "6061",
   process: "cnc-machining",
-  quantity: 1,
-  surfaceFinish: "standard",
   tolerance: "ISO2768-m",
   surfaceRoughness: "Ra3.2",
 } as const;
@@ -35,18 +31,12 @@ export class CliError extends Error {
   }
 }
 
-export interface SubmitInput {
-  filePath: string;
+export interface SubmitAnalysisInput {
+  filePaths: string[];
   material?: string;
   process?: string;
-  quantity?: number;
-  surfaceFinish?: string;
   tolerance?: string;
   surfaceRoughness?: string;
-}
-
-export interface SubmitBatchInput extends Omit<SubmitInput, "filePath"> {
-  filePaths: string[];
 }
 
 interface ClientOptions {
@@ -64,7 +54,7 @@ interface InspectedFile {
   sha256: string;
 }
 
-export class QuoteClient {
+export class AnalysisClient {
   private readonly baseUrl: string;
   private readonly resultBaseUrl: string;
   private readonly fetchImpl: typeof fetch;
@@ -74,38 +64,19 @@ export class QuoteClient {
     this.baseUrl = (options.baseUrl ?? DEFAULT_API_BASE_URL).replace(/\/$/, "");
     this.resultBaseUrl = (options.resultBaseUrl ?? DEFAULT_RESULT_BASE_URL).replace(/\/$/, "");
     this.fetchImpl = options.fetchImpl ?? fetch;
-    this.pollIntervalMs = options.pollIntervalMs ?? 2_000;
+    // Interactive analysis should surface a completed worker result promptly.
+    // This only affects status refresh; Redis workers still execute asynchronously.
+    this.pollIntervalMs = options.pollIntervalMs ?? 750;
   }
 
-  async options(): Promise<QuoteOptions> {
-    return this.request<QuoteOptions>("/v1/public/part-quote-options");
+  async options(): Promise<AnalysisOptions> {
+    return this.request<AnalysisOptions>("/v1/public/part-analysis-options");
   }
 
-  async submit(input: SubmitInput): Promise<QuoteResult> {
-    const file = await inspectFile(input.filePath);
-    const normalized = normalizeInput(input);
-    const intent = await this.request<UploadIntent>("/v1/public/part-quotes", {
-      method: "POST",
-      body: JSON.stringify({
-        file_name: file.name,
-        file_size: file.size,
-        checksum: `sha256:${file.sha256}`,
-        content_type: "model/step",
-        ...requestSpecification(normalized),
-      }),
-      headers: jsonHeaders(),
-    });
-    await this.upload(file.path, intent);
-    return this.request<QuoteResult>(
-      `/v1/public/part-quotes/${encodeURIComponent(intent.quote_id)}/complete`,
-      { method: "POST" },
-    );
-  }
-
-  async submitBatch(input: SubmitBatchInput): Promise<BatchQuoteResult> {
+  async submitBatch(input: SubmitAnalysisInput): Promise<AnalysisBatchResult> {
     const files = await inspectFiles(input.filePaths);
     const normalized = normalizeInput(input);
-    const intent = await this.request<BatchUploadIntent>("/v1/public/part-quote-batches", {
+    const intent = await this.request<AnalysisBatchUploadIntent>("/v1/public/part-analysis-batches", {
       method: "POST",
       body: JSON.stringify({
         files: files.map((file) => ({
@@ -114,49 +85,39 @@ export class QuoteClient {
           checksum: `sha256:${file.sha256}`,
           content_type: "model/step",
         })),
-        ...requestSpecification(normalized),
+        material: normalized.material,
+        process: normalized.process,
+        tolerance: normalized.tolerance,
+        surface_roughness: normalized.surfaceRoughness,
       }),
       headers: jsonHeaders(),
     });
     if (intent.items.length !== files.length) {
-      throw new CliError("报价服务返回的上传地址数量与文件数量不一致。", 5);
+      throw new CliError("分析服务返回的上传地址数量与文件数量不一致。", 5);
     }
     await mapWithConcurrency(files, MAX_CONCURRENT_PARTS, async (file, index) => {
-      await this.upload(file.path, intent.items[index]!);
+      const item = intent.items[index]!;
+      await this.upload(file.path, item.upload_url, item.upload_method, item.required_headers);
     });
-    const result = await this.request<BatchQuoteResult>(
-      `/v1/public/part-quote-batches/${encodeURIComponent(intent.batch_id)}/complete`,
+    const result = await this.request<AnalysisBatchResult>(
+      `/v1/public/part-analysis-batches/${encodeURIComponent(intent.batch_id)}/complete`,
       { method: "POST" },
     );
     return this.decorateBatch(result);
   }
 
-  async status(quoteId: string): Promise<QuoteResult> {
-    return this.request<QuoteResult>(`/v1/public/part-quotes/${encodeURIComponent(quoteId)}`);
-  }
-
-  async batchStatus(batchId: string): Promise<BatchQuoteResult> {
-    const result = await this.request<BatchQuoteResult>(
-      `/v1/public/part-quote-batches/${encodeURIComponent(batchId)}`,
+  async batchStatus(batchId: string): Promise<AnalysisBatchResult> {
+    const result = await this.request<AnalysisBatchResult>(
+      `/v1/public/part-analysis-batches/${encodeURIComponent(batchId)}`,
     );
     return this.decorateBatch(result);
-  }
-
-  async wait(quoteId: string, timeoutMs = 10 * 60_000): Promise<QuoteResult> {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      const result = await this.status(quoteId);
-      if (isQuoteTerminal(result.status)) return result;
-      await delay(this.pollIntervalMs);
-    }
-    throw new CliError("等待报价超时，可稍后使用 quote status 继续查询。", 3);
   }
 
   async waitBatch(
     batchId: string,
     timeoutMs = 10 * 60_000,
-    onPoll?: (result: BatchQuoteResult) => void,
-  ): Promise<BatchQuoteResult> {
+    onPoll?: (result: AnalysisBatchResult) => void,
+  ): Promise<AnalysisBatchResult> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const result = await this.batchStatus(batchId);
@@ -164,24 +125,28 @@ export class QuoteClient {
       if (isBatchTerminal(result.status)) return result;
       await delay(this.pollIntervalMs);
     }
-    throw new CliError("等待批次报价超时，可稍后使用 quote status <batch-id> --wait 继续查询。", 3);
+    throw new CliError("等待分析超时，可稍后使用 analyze status <batch-id> --wait 继续查询。", 3);
   }
 
-  private decorateBatch(result: BatchQuoteResult): BatchQuoteResult {
+  private decorateBatch(result: AnalysisBatchResult): AnalysisBatchResult {
     return {
       ...result,
       result_url: `${this.resultBaseUrl}/zh${result.result_path}`,
     };
   }
 
-  private async upload(filePath: string, intent: UploadIntent): Promise<void> {
-    const uploadRequest = {
-      method: intent.upload_method,
-      headers: intent.required_headers ?? {},
+  private async upload(
+    filePath: string,
+    uploadUrl: string,
+    method: string,
+    headers: Record<string, string> = {},
+  ): Promise<void> {
+    const response = await this.fetchImpl(uploadUrl, {
+      method,
+      headers,
       body: createReadStream(filePath),
       duplex: "half",
-    } as unknown as RequestInit;
-    const response = await this.fetchImpl(intent.upload_url, uploadRequest);
+    } as unknown as RequestInit);
     if (!response.ok) throw new CliError(`文件上传失败（HTTP ${response.status}）。`, 5);
   }
 
@@ -190,12 +155,12 @@ export class QuoteClient {
     try {
       response = await this.fetchImpl(`${this.baseUrl}${path}`, init);
     } catch (error) {
-      throw new CliError("无法连接有象报价服务。", 5, error);
+      throw new CliError("无法连接有象零件分析服务。", 5, error);
     }
     const raw = await response.text();
     const body = raw ? safeJson(raw) : undefined;
     if (!response.ok) {
-      const message = extractErrorMessage(body) ?? `报价服务返回 HTTP ${response.status}。`;
+      const message = extractErrorMessage(body) ?? `分析服务返回 HTTP ${response.status}。`;
       const exitCode = response.status === 429 || response.status >= 500 ? 5 : 4;
       throw new CliError(message, exitCode, body);
     }
@@ -240,54 +205,34 @@ export async function inspectFile(filePath: string): Promise<InspectedFile> {
 export async function inspectFiles(filePaths: string[]): Promise<InspectedFile[]> {
   if (filePaths.length === 0) throw new CliError("请至少明确指定一个 STEP/STP 文件。", 4);
   if (filePaths.length > MAX_CONCURRENT_PARTS) {
-    throw new CliError(`一个批次最多同时报价 ${MAX_CONCURRENT_PARTS} 个零件，请分批顺序提交。`, 4);
+    throw new CliError(`一个批次最多同时分析 ${MAX_CONCURRENT_PARTS} 个零件，请分批顺序提交。`, 4);
   }
   const files = await Promise.all(filePaths.map(inspectFile));
   const seen = new Set<string>();
   for (const file of files) {
-    if (seen.has(file.realPath)) throw new CliError(`同一个文件不能重复报价：${file.path}`, 4);
+    if (seen.has(file.realPath)) throw new CliError(`同一个文件不能重复分析：${file.path}`, 4);
     seen.add(file.realPath);
   }
   return files;
 }
 
-export function isQuoteTerminal(status: QuoteResult["status"]): boolean {
-  return ["succeeded", "no_auto_quote", "failed", "expired"].includes(status);
+export function isBatchTerminal(status: AnalysisBatchResult["status"]): boolean {
+  return ["completed", "completed_with_gaps", "failed", "expired"].includes(status);
 }
 
-export function isBatchTerminal(status: BatchQuoteResult["status"]): boolean {
-  return status === "succeeded" || status === "completed_with_errors";
-}
-
-function normalizeInput(input: Omit<SubmitInput, "filePath">): Required<Omit<SubmitInput, "filePath">> {
-  const quantity = input.quantity ?? DEFAULT_QUOTE_INPUT.quantity;
-  if (!Number.isInteger(quantity) || quantity <= 0) throw new CliError("--quantity 必须是正整数。", 4);
-  const process = normalizeProcess(input.process ?? DEFAULT_QUOTE_INPUT.process);
+function normalizeInput(input: SubmitAnalysisInput): Required<Omit<SubmitAnalysisInput, "filePaths">> {
+  const process = normalizeProcess(input.process ?? DEFAULT_ANALYSIS_INPUT.process);
   return {
-    material: input.material?.trim() || DEFAULT_QUOTE_INPUT.material,
+    material: input.material?.trim() || DEFAULT_ANALYSIS_INPUT.material,
     process,
-    quantity,
-    surfaceFinish: input.surfaceFinish?.trim() || DEFAULT_QUOTE_INPUT.surfaceFinish,
-    tolerance: input.tolerance?.trim() || DEFAULT_QUOTE_INPUT.tolerance,
-    surfaceRoughness: input.surfaceRoughness?.trim() || DEFAULT_QUOTE_INPUT.surfaceRoughness,
+    tolerance: input.tolerance?.trim() || DEFAULT_ANALYSIS_INPUT.tolerance,
+    surfaceRoughness: input.surfaceRoughness?.trim() || DEFAULT_ANALYSIS_INPUT.surfaceRoughness,
   };
 }
 
 function normalizeProcess(value: string): string {
   const normalized = value.trim().toLowerCase();
-  if (normalized === "cnc" || normalized === "cnc-machining") return "cnc-machining";
-  return normalized;
-}
-
-function requestSpecification(input: Required<Omit<SubmitInput, "filePath">>): Record<string, unknown> {
-  return {
-    material: input.material,
-    process: input.process,
-    quantity: input.quantity,
-    surface_finish: input.surfaceFinish,
-    tolerance: input.tolerance,
-    surface_roughness: input.surfaceRoughness,
-  };
+  return normalized === "cnc" ? "cnc-machining" : normalized;
 }
 
 function jsonHeaders(): Record<string, string> {
@@ -317,7 +262,7 @@ function safeJson(raw: string): unknown {
   try {
     return JSON.parse(raw);
   } catch {
-    throw new CliError("报价服务返回了无法解析的数据。", 5);
+    throw new CliError("分析服务返回了无法解析的数据。", 5);
   }
 }
 

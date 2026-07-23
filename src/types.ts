@@ -1,42 +1,29 @@
-export type QuoteStatus =
-  | "awaiting_upload"
-  | "queued"
-  | "analyzing"
-  | "succeeded"
-  | "no_auto_quote"
+export type AnalysisStatus =
+  | "processing"
+  | "completed"
+  | "completed_with_gaps"
   | "failed"
   | "expired";
 
-export type BatchStatus =
-  | "awaiting_upload"
-  | "processing"
-  | "succeeded"
-  | "completed_with_errors";
-
-export interface QuoteOptions {
+export interface AnalysisOptions {
   materials: Array<{ value: string; label: string }>;
   processes: Array<{ value: string; label: string }>;
-  surface_finishes?: Array<{ value: string; label: string }>;
   surface_roughness?: Array<{ value: string; label: string }>;
   tolerances?: Array<{ value: string; label: string }>;
   max_file_bytes: number;
   supported_extensions: string[];
-  defaults?: QuoteDefaults;
-  capabilities?: Record<string, boolean>;
+  defaults?: {
+    material: string;
+    process: string;
+    tolerance: string;
+    surface_roughness: string;
+  };
+  capabilities?: Record<string, boolean | number | null>;
 }
 
-export interface QuoteDefaults {
-  material: string;
-  process: string;
-  quantity: number;
-  surface_finish: string;
-  tolerance: string;
-  surface_roughness: string;
-}
-
-export interface UploadIntent {
-  quote_id: string;
-  status: QuoteStatus;
+export interface AnalysisUploadIntent {
+  analysis_id: string;
+  status: "awaiting_upload";
   upload_method: "PUT";
   upload_url: string;
   required_headers?: Record<string, string>;
@@ -44,21 +31,12 @@ export interface UploadIntent {
   expires_at: string;
 }
 
-export interface BatchUploadIntent {
+export interface AnalysisBatchUploadIntent {
   batch_id: string;
   status: "awaiting_upload";
   result_path: string;
-  items: UploadIntent[];
+  items: AnalysisUploadIntent[];
   expires_at: string;
-}
-
-export interface PriceOption {
-  option_type: "economy" | "standard" | "express";
-  quantity: number;
-  unit_price_cents: number;
-  total_price_cents: number;
-  currency: string;
-  lead_time_days: number;
 }
 
 export interface DfmFinding {
@@ -71,33 +49,30 @@ export interface DfmFinding {
   viewer_node_ids: number[];
 }
 
-export interface DfmResult {
-  auto_quote_available: boolean;
+export interface AnalysisDfm {
   risk_level: string;
   warnings: string[];
   suggestions: string[];
-  required_manual_review: boolean;
-  findings?: DfmFinding[];
+  findings: DfmFinding[];
 }
 
-export interface MachiningTimeHours {
-	/** Always autocam for v0.3 results. */
-	source?: "autocam";
-	setup_count?: number;
-	estimate_grade?: string;
-	stages?: Array<{ code: string; hours: number }>;
-  first_rough: number;
-  second_rough: number;
-  hole_rough: number;
-  semi_finishing: number;
-  finishing: number;
-  hole_finishing: number;
-  sharp_edge_deburring: number;
-  tool_change: number;
+export interface MachiningTime {
+  source?: "autocam";
+  setup_count: number;
+  estimate_grade?: string;
+  stages?: Array<{ code: string; hours: number }>;
   total_processing: number;
 }
 
-export interface GeometrySummary {
+export interface MinimumStock {
+  shape: "block" | "cylinder";
+  dimensions_mm: Record<string, number>;
+  volume_cm3: number;
+  material_density_kg_m3: number;
+  mass_kg: number;
+}
+
+export interface AnalysisGeometry {
   length_mm: number;
   width_mm: number;
   height_mm: number;
@@ -105,9 +80,10 @@ export interface GeometrySummary {
   surface_area_cm2: number;
   complexity_score: number;
   complexity_level: "low" | "medium" | "high";
+  minimum_stock?: MinimumStock;
 }
 
-export interface QuotePreview {
+export interface AnalysisPreview {
   status: "pending" | "running" | "succeeded" | "failed";
   image_status?: "pending" | "running" | "succeeded" | "failed";
   scs_url?: string;
@@ -115,33 +91,40 @@ export interface QuotePreview {
   error_message?: string;
 }
 
-export interface QuoteResult {
-  quote_id: string;
-  status: QuoteStatus;
+export interface AnalysisComponent {
+  status: "pending" | "succeeded" | "unavailable" | "failed";
+  error_code?: string;
+}
+
+export interface AnalysisResult {
+  analysis_id: string;
+  status: AnalysisStatus;
   file_name: string;
-  quantity: number;
   material: string;
   process: string;
-  surface_finish?: string;
   tolerance?: string;
   surface_roughness?: string;
-  price_options: PriceOption[];
-  machining_time_hours?: MachiningTimeHours;
-  geometry?: GeometrySummary;
-  dfm?: DfmResult;
-  preview?: QuotePreview;
-  error_code?: string;
+  components: {
+    geometry: AnalysisComponent;
+    dfm: AnalysisComponent;
+    machining: AnalysisComponent;
+    preview: AnalysisComponent;
+  };
+  machining?: MachiningTime;
+  geometry?: AnalysisGeometry;
+  dfm?: AnalysisDfm;
+  preview?: AnalysisPreview;
   requested_at: string;
   completed_at?: string;
   expires_at: string;
 }
 
-export interface BatchQuoteResult {
+export interface AnalysisBatchResult {
   batch_id: string;
-  status: BatchStatus;
+  status: AnalysisStatus;
   result_path: string;
   result_url?: string;
-  items: QuoteResult[];
+  items: AnalysisResult[];
   requested_at: string;
   expires_at: string;
 }
