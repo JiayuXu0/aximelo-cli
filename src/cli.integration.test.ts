@@ -44,8 +44,25 @@ describe("CLI integration", () => {
       env: { ...process.env, HOME: isolatedHome, XDG_CONFIG_HOME: configRoot },
     });
     expect(result.status).toBe(0);
-    expect(JSON.parse(result.stdout)).toMatchObject({ ok: true, cost_profile: "missing" });
+    const payload = JSON.parse(result.stdout);
+    expect(payload).toMatchObject({ ok: true, cost_profile: "missing" });
+    expect(payload.capabilities).toContain("只上传明确指定的 STEP/STP 文件，不扫描目录或相邻文件");
+    expect(payload.capabilities).toContain("最小毛坯形状/尺寸/体积/密度/重量");
+    expect(payload.capabilities).toContain("总加工工时与粗加工/半精加工/精加工等实际分阶段工时");
     await expect(access(join(isolatedHome, ".codex", "skills", "yoxiang-part-analysis", "SKILL.md"))).resolves.toBeUndefined();
     await expect(access(join(configRoot, "yoxiang", "cost-profile.json"))).rejects.toBeDefined();
+  });
+
+  it("explains capabilities and optional local estimate setup after install", async () => {
+    const isolatedHome = await mkdtemp(join(tmpdir(), "yoxiang-install-copy-home-"));
+    const result = spawnSync(process.execPath, ["dist/cli.js", "install", "--agent", "codex"], {
+      cwd: process.cwd(), encoding: "utf8",
+      env: { ...process.env, HOME: isolatedHome, XDG_CONFIG_HOME: join(isolatedHome, ".config") },
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("只上传明确指定的 STEP/STP 文件");
+    expect(result.stdout).toContain("粗加工/半精加工/精加工");
+    expect(result.stdout).toContain("如需本地成本估算");
+    expect(result.stdout).toContain("费率只保存在本机");
   });
 });

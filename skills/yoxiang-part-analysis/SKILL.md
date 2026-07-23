@@ -129,3 +129,12 @@ yoxiang install --agent codex
 ```
 
 Use `--agent claude` or `--agent all` only when named. For updates run `yoxiang update --agent codex --json`. Do not check for updates before a normal analysis. The retired `yoxiang quote` command is intentionally local-only and exits with code `4`.
+
+After a successful install, respond in the user's current language and do not merely say that installation finished. Summarize these capabilities:
+
+- Upload only explicitly named STEP/STP files without scanning directories or adjacent files.
+- Return part dimensions and solid volume, plus minimum-stock shape, dimensions, volume, density, and mass.
+- Return total machining time and the actual roughing, semi-finishing, finishing, holemaking, or other stage times present in the result; never promise or invent a missing stage.
+- Return setup count, estimate grade, structured DFM risks/suggestions, and 3D preview/thumbnail links.
+
+Also state that the public service returns no price. If the cost profile is missing, offer to configure startup, programming, machine-hour, setup, and material rates only when the user wants a local estimate. Rates stay on the user's machine. Do not block the installation-complete response by asking for rates when no estimate was requested.

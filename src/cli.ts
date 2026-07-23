@@ -321,7 +321,16 @@ async function installSkill(agent: "codex" | "claude" | "all"): Promise<string[]
 }
 
 function atomicCapabilities(): string[] {
-  return ["零件几何与尺寸", "最小毛坯形状/尺寸/体积/重量", "总工时与分阶段工时", "装夹次数与估算等级", "DFM findings/建议/3D 节点", "3D 预览与缩略图", "本地成本参数管理"];
+  return [
+    "只上传明确指定的 STEP/STP 文件，不扫描目录或相邻文件",
+    "零件长宽高、实体体积、表面积与复杂度",
+    "最小毛坯形状/尺寸/体积/密度/重量",
+    "总加工工时与粗加工/半精加工/精加工等实际分阶段工时",
+    "装夹次数与估算等级",
+    "DFM findings/建议/关联 3D 节点",
+    "3D 预览与缩略图",
+    "本地成本参数管理与透明估算",
+  ];
 }
 
 function formatInstall(paths: string[], profile: string, includeCapabilities: boolean): string {
@@ -331,6 +340,9 @@ function formatInstall(paths: string[], profile: string, includeCapabilities: bo
     ...(includeCapabilities ? ["", "可用原子能力：", ...atomicCapabilities().map((item) => `- ${item}`)] : []),
     "",
     profile === "missing" ? `本地成本配置尚未创建：${costProfilePath()}` : `本地成本配置：${profile === "existing" ? "已保留" : "已创建"}`,
+    profile === "missing"
+      ? "如需本地成本估算，可继续配置开机固定费、编程费、机时费、装夹费和材料单价；费率只保存在本机。"
+      : "公共服务不返回价格；如需估算，由 Agent 使用本机费率透明计算。",
   ].join("\n");
 }
 

@@ -17,6 +17,26 @@ yoxiang install --agent codex
 
 非交互或 `--json` 安装不会卡在输入，结果会标记 `cost_profile: missing`；Agent 第一次需要算价时再询问并保存。
 
+## 给 Agent 的安装完成回执要求
+
+如果你是按照本页执行安装的 Agent，安装成功后不能只回复“安装完成”。请使用用户当前语言，明确告诉用户这个 Skill 可以：
+
+1. 只上传用户明确指定的 STEP/STP 文件，不扫描目录或相邻文件；每批最多 5 个，每个最大 10 MiB。
+2. 返回零件长宽高、实体体积、表面积和复杂度。
+3. 返回最小毛坯形状、尺寸、体积、材料密度和重量。
+4. 返回总加工工时，以及服务端实际提供的粗加工、半精加工、精加工、孔加工等分阶段工时；缺少某个阶段时应说明缺失，不得编造。
+5. 返回装夹次数、估算等级、结构化 DFM 风险与建议，以及 3D 预览和缩略图链接。
+
+安装完成后还要提醒用户：公共服务不返回价格或交期。如果用户需要本地成本估算，可以继续配置开机固定费、编程费、机时费、装夹费和材料单价；费率只保存在用户本机。用户没有要求估价时，只做一次可选提醒，不要阻塞追问费率。
+
+推荐回执：
+
+```text
+安装完成。yoxiang-part-analysis 可以安全上传你明确指定的 STEP/STP 文件，并返回零件尺寸与实体体积、最小毛坯尺寸/体积/重量、总加工工时、粗加工/半精加工/精加工等阶段工时、装夹次数、DFM 风险建议和 3D 预览。
+
+有象公共服务不返回价格。如果你需要本地成本估算，我还可以帮你设置开机固定费、编程费、机时费、装夹费和材料单价；这些费率只保存在本机。
+```
+
 ## 原子能力
 
 - `yoxiang analyze <files...> --wait --json`：一次分析一个批次
@@ -81,4 +101,4 @@ yoxiang doctor --help
 
 # Yoxiang Part Analysis CLI and Skill
 
-Install Node.js 20+, then run `npm install -g @yoxiang/cli@next` and `yoxiang install --agent codex`. The public service returns manufacturing geometry, minimum stock, machining stages, setup count, DFM, and seven-day 3D links—never pricing or lead time. Rates stay in the local cost profile; the Agent calculates estimates with the documented formula.
+Install Node.js 20+, then run `npm install -g @yoxiang/cli@next` and `yoxiang install --agent codex`. After installation, the Agent must summarize explicit STEP/STP upload safety, part and minimum-stock dimensions/volume/mass, total and roughing/finishing stage times when available, setup count, DFM, and seven-day 3D links. The public service never returns pricing or lead time. Offer local rate setup only when the user needs an estimate; rates stay on the user's machine.
