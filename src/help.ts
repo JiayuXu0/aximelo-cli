@@ -65,7 +65,7 @@ ${shared}`,
   yoxiang cost-profile stock-adjustment set [--block-allowance-per-side-mm N] [--cylinder-radial-allowance-mm N] [--cylinder-end-allowance-mm N] [--round-up-mm N]
 
 configure 不带参数时在交互终端依次询问开机固定费、编程费、机时费、装夹费和 6061 材料单价。所有值可为 0；默认币种 CNY。
-默认毛坯余量和取整粒度均为 0。配置文件在 POSIX 上以 0600 保存。`,
+默认长方体单边余量、圆柱径向余量和圆柱端面余量均为 3 mm；默认取整粒度为 0。配置文件在 POSIX 上以 0600 保存。`,
   doctor: `检查公开制造分析服务连通性和能力；不读取或上传 STEP 文件。
 
 用法：

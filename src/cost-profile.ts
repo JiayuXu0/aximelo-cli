@@ -62,9 +62,9 @@ export async function configureCostProfile(input: ConfigureCostProfileInput): Pr
       },
     },
     stock_adjustment: {
-      block_allowance_per_side_mm: 0,
-      cylinder_radial_allowance_mm: 0,
-      cylinder_end_allowance_mm: 0,
+      block_allowance_per_side_mm: 3,
+      cylinder_radial_allowance_mm: 3,
+      cylinder_end_allowance_mm: 3,
       round_up_mm: 0,
     },
   };

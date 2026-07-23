@@ -73,7 +73,7 @@ yoxiang cost-profile material set 7075 --price-per-kg 36
 yoxiang cost-profile stock-adjustment set --block-allowance-per-side-mm 2 --round-up-mm 5
 ```
 
-毛坯余量默认都是 `0`，不取整。可分别配置长方体单边余量、圆柱径向余量、圆柱端面余量和尺寸向上取整粒度。CLI/Skill 更新不会覆盖现有配置。
+长方体单边余量、圆柱径向余量和圆柱端面余量默认均为 `3 mm`，默认不取整。即长方体长宽高各增加 `6 mm`，圆柱直径和长度各增加 `6 mm`。可分别修改三种余量和尺寸向上取整粒度。CLI/Skill 更新不会覆盖现有配置；新建成本配置采用上述默认值。
 
 Agent 使用固定公式直接计算，不调用本地或服务端报价引擎：
 

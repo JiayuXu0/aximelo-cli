@@ -75,9 +75,9 @@ Never infer or invent a rate. Updating the CLI or Skill must not replace an exis
 
 ## Stock adjustment
 
-With all adjustments at their default `0`, use the service's minimum-stock mass unchanged.
+Unless the user explicitly configures other values, use these defaults: `block_allowance_per_side_mm = 3`, `cylinder_radial_allowance_mm = 3`, `cylinder_end_allowance_mm = 3`, and `round_up_mm = 0`. Thus a block gains `6 mm` on every dimension; a cylinder gains `6 mm` on both diameter and length. Recompute adjusted stock volume and mass without early rounding.
 
-When adjustments are configured, recompute without early rounding:
+Apply the stored adjustments as follows:
 
 - Block: add twice `block_allowance_per_side_mm` to each of length, width, and height.
 - Cylinder: add twice `cylinder_radial_allowance_mm` to diameter and twice `cylinder_end_allowance_mm` to length.
