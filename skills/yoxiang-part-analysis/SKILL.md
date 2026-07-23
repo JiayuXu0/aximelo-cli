@@ -27,7 +27,7 @@ Use the public service for manufacturing analysis only. It never returns a price
 - Defaults are material `6061`, process `cnc-machining`, tolerance `ISO2768-m`, and roughness `Ra3.2`. Do not ask about omitted manufacturing parameters.
 - Do not call ERP, debug, internal quote, or retired public quote endpoints. Do not expose internal algorithms, traces, storage paths, or rules.
 - Treat the output and any locally calculated cost as an estimate, not an order or binding offer.
-- Analysis and 3D results are retained for seven days. Remind the user not to upload a model they are not authorized to share.
+- The public share link, including its 3D access, is valid for seven days. Do not describe this as the retention period for uploaded files or stored analysis results. Remind the user not to upload a model they are not authorized to share.
 
 ## Analysis workflow
 
@@ -111,7 +111,7 @@ total = startup_fee_per_design
 
 ## Response order
 
-1. Seven-day result link and preview availability.
+1. Public share link validity (seven days) and preview availability.
 2. Per-part dimensions, solid volume, surface area, complexity, and minimum stock.
 3. Total/stage machining time, setup count, and estimate grade.
 4. Prominent DFM findings and any component gaps.
