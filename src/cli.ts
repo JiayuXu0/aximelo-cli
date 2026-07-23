@@ -306,8 +306,21 @@ function formatBatchResult(result: BatchQuoteResult): string {
   }
   lines.push("", "加工时间：");
   for (const item of result.items) {
-    const total = item.machining_time_hours?.total_processing;
-    lines.push(`- ${item.file_name}：${total === undefined ? "分析中或暂无数据" : `${total.toFixed(2)} 小时`}`);
+    const machining = item.machining_time_hours;
+    if (!machining) {
+      lines.push(`- ${item.file_name}：分析中或暂无数据`);
+      continue;
+    }
+    const total = machining.total_processing;
+    const metadata = [
+      machining.source === "autocam" ? "AutoCam" : undefined,
+      machining.setup_count === undefined ? undefined : `${machining.setup_count} 次装夹`,
+      machining.estimate_grade ? `${machining.estimate_grade} 级` : undefined,
+    ].filter(Boolean);
+    lines.push(`- ${item.file_name}：${total.toFixed(2)} 小时${metadata.length ? `（${metadata.join("，")}）` : ""}`);
+    for (const stage of machining.stages ?? []) {
+      lines.push(`  ${stageLabel(stage.code)}：${stage.hours.toFixed(2)} 小时`);
+    }
   }
   const findings = result.items.flatMap((item) => publicFindings(item));
   lines.push("", "DFM / 异常：", ...(findings.length ? findings.map((finding) => `- ${finding}`) : ["- 暂无公开异常"]));
@@ -337,4 +350,16 @@ function publicFindings(item: QuoteResult): string[] {
 
 function priceLabel(option: "economy" | "standard" | "express"): string {
   return { economy: "经济", standard: "标准", express: "加急" }[option];
+}
+
+function stageLabel(code: string): string {
+  const labels: Record<string, string> = {
+    roughing: "粗加工",
+    semi_finishing: "半精加工",
+    finishing: "精加工",
+    holemaking: "孔加工",
+    threading: "螺纹",
+    machine_actions: "机内动作",
+  };
+  return labels[code] ?? code;
 }

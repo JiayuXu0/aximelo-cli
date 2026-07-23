@@ -46,7 +46,7 @@ describe("CLI help integration", () => {
       env: { ...process.env, YOXIANG_API_BASE_URL: "http://127.0.0.1:1" },
     });
     expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe("0.2.0-next.0");
+    expect(result.stdout.trim()).toBe("0.3.0-next.0");
     expect(result.stderr).toBe("");
   });
 

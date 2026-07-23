@@ -1,10 +1,11 @@
-export const CLI_VERSION = "0.2.0-next.0";
+export const CLI_VERSION = "0.3.0-next.0";
 
 const shared = `默认参数：6061 铝、CNC、数量 1、标准表面处理、ISO 2768-m、Ra 3.2。
 限制：每个 STEP/STP 文件不超过 10 MiB（10,485,760 bytes）。
 并发：每个批次最多 5 个零件；当前不限制每天报价次数。
 安全：只上传命令中明确列出的文件路径；不接受目录、glob，也不会扫描相邻文件。
-返回：经济/标准/加急三档价格、加工时间、几何摘要、DFM，以及保留 7 天的 3D 结果链接。
+返回：经济/标准/加急三档价格、AutoCam 总工时与阶段、装夹次数、几何摘要、DFM，以及保留 7 天的 3D 结果链接。
+判定：任一 DFM warning 或 AutoCam 工时不可用时返回 no_auto_quote，不回退旧价格。
 
 退出码：
   0  成功或显示帮助

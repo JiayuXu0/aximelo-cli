@@ -81,6 +81,11 @@ export interface DfmResult {
 }
 
 export interface MachiningTimeHours {
+	/** Always autocam for v0.3 results. */
+	source?: "autocam";
+	setup_count?: number;
+	estimate_grade?: string;
+	stages?: Array<{ code: string; hours: number }>;
   first_rough: number;
   second_rough: number;
   hole_rough: number;
@@ -125,7 +130,7 @@ export interface QuoteResult {
   geometry?: GeometrySummary;
   dfm?: DfmResult;
   preview?: QuotePreview;
-  error_code?: "automatic_quote_unavailable" | "analysis_failed";
+  error_code?: string;
   requested_at: string;
   completed_at?: string;
   expires_at: string;

@@ -28,8 +28,8 @@ describe("分级帮助", () => {
         "doctor": "4f0555adfeb45b5eda29c2dd834c33cd39be08602d377483bb731a7e6289ae3c",
         "install": "ae642ef1c512c65575da9f724b94a3407e72a4e0b1103d3156dfd9976377c512",
         "options": "c39b2b60fbfc22f18ecb886e86df120baebfd1d71f09b42a6b9fbe48a4598c8e",
-        "quote": "e86b65dc32cc71394ee7f002ec20fb2540c5d4f245787f23ffe6e436160fe5ff",
-        "root": "287fd285e3f6382bd85398ca3e3f2174d4ccc11ab30f1565aac10c1cf535b2fd",
+        "quote": "27932feb6fdc4656ada7c6781eca359fdfa8fc5014fa99ea59e53cce91e65002",
+        "root": "039570b591bf73d61a746d32c66ceae24ff3cb92dc6de9e1fb18a944feb23216",
         "status": "79d753303341911a4e110bbc5c82b5b9845a70a29ed30473eb5e69afedcd8d7a",
         "update": "2ff51dfdb938fd2a9573cf98cb438b85da4c1265c17d3c72c62fb7e666fe8815",
       }

@@ -26,6 +26,7 @@ Do not ask for manufacturing parameters when the user omits them. Use:
 - Each file must be `.step` or `.stp` and no larger than 10 MiB (10,485,760 bytes).
 - Quote at most five parts concurrently. Daily quote count is currently unlimited; for more than five explicit files, submit sequential groups of at most five and never fan out parallel CLI processes.
 - Never call ERP/debug endpoints or expose costs, algorithms, traces, storage paths, or internal rules.
+- Never calculate, reconstruct, or fall back to the retired legacy machining time or price. Any DFM warning/fail, unavailable AutoCam estimate, or untrusted AutoCam estimate means `no_auto_quote`.
 - Treat results as test estimates, not orders or binding offers.
 
 ## Workflow
@@ -71,7 +72,7 @@ Present in this order:
 
 1. Result link for the seven-day batch page and 3D viewer.
 2. A table with each part's economy, standard, and expedited price and lead time.
-3. Total and available stage machining times.
+3. AutoCam total and available stage machining times, setup count, and estimate grade.
 4. Public DFM findings or failures.
 
-For `no_auto_quote`, say automatic pricing is unavailable and never invent a price. For partial batches, preserve each part's independent status. Do not claim that a part entered manual review unless the response explicitly says so.
+For `no_auto_quote`, distinguish a DFM block from an unavailable/untrusted machining-time estimate when the response provides a reason code, and never invent a price. For partial batches, preserve each part's independent status. Do not claim that a part entered manual review unless the response explicitly says so.
