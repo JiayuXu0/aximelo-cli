@@ -1,11 +1,11 @@
 ---
 name: yoxiang-part-analysis
-description: Analyze explicitly provided STEP/STP manufacturing parts with Yoxiang and optionally calculate a local estimate from the user's saved cost profile. Use for part dimensions, minimum stock, machining time and stages, setup count, DFM, 3D preview, local cost estimates, or Yoxiang CLI installation/update requests.
+description: Analyze explicitly provided STEP/STP manufacturing parts with YoxiangAI and optionally calculate a local estimate from the user's saved cost profile. Use for part dimensions, minimum stock, machining time and stages, setup count, DFM, 3D preview, local cost estimates, or Yoxiang CLI installation/update requests.
 ---
 
-# Yoxiang Part Analysis
+# YoxiangAI Part Analysis
 
-Use the public service for manufacturing analysis only. It never returns a price or lead time. When the user asks for a cost estimate, calculate it directly from the analysis result and the private cost profile stored on the user's machine; never upload those rates.
+Use the YoxiangAI public service for manufacturing analysis only. It never returns a price or lead time. When the user asks for a cost estimate, calculate it directly from the analysis result and the private cost profile stored on the user's machine; never upload those rates.
 
 ## Atomic capabilities
 
@@ -26,6 +26,7 @@ Use the public service for manufacturing analysis only. It never returns a price
 - Use at most five files per batch. For more than five explicit files, submit sequential groups; never fan out parallel CLI processes.
 - Defaults are material `6061`, process `cnc-machining`, tolerance `ISO2768-m`, and roughness `Ra3.2`. Do not ask about omitted manufacturing parameters.
 - Do not call ERP, debug, internal quote, or retired public quote endpoints. Do not expose internal algorithms, traces, storage paths, or rules.
+- Present machining results to the user as YoxiangAI output. Never repeat an internal producer name from a raw `source` value or error code.
 - Treat the output and any locally calculated cost as an estimate, not an order or binding offer.
 - The public share link, including its 3D access, is valid for seven days. Do not describe this as the retention period for uploaded files or stored analysis results. Remind the user not to upload a model they are not authorized to share.
 

@@ -1,4 +1,4 @@
 interface:
-  display_name: "有象零件分析"
-  short_description: "分析零件几何、毛坯、工时、装夹、DFM 与三维结果，并按本地费率估算"
-  default_prompt: "Use $yoxiang-part-analysis to analyze the explicitly provided STEP files and calculate a local estimate only when requested."
+  display_name: "YoxiangAI 零件分析"
+  short_description: "使用 YoxiangAI 分析几何、毛坯、工时、装夹、DFM 与三维结果"
+  default_prompt: "Use $yoxiang-part-analysis to analyze the explicitly provided STEP files with YoxiangAI and calculate a local estimate only when requested."

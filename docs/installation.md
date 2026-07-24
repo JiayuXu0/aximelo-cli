@@ -1,6 +1,6 @@
-# 有象零件分析 CLI 与 Skill 安装指南
+# YoxiangAI 零件分析 CLI 与 Skill 安装指南
 
-`@yoxiang/cli` 把明确指定的 STEP/STP 文件提交给有象制造分析服务，返回零件尺寸、实体体积、表面积、复杂度、最小毛坯、加工总工时与阶段、装夹次数、DFM 和 3D 预览。公共服务不返回价格、交期或内部定价信息。
+`@yoxiang/cli` 把明确指定的 STEP/STP 文件提交给 YoxiangAI 制造分析服务，返回零件尺寸、实体体积、表面积、复杂度、最小毛坯、加工总工时与阶段、装夹次数、DFM 和 3D 预览。公共服务不返回价格、交期或内部定价信息。
 
 > 公开结果分享链接及其中的 3D 访问有效 7 天；这不是上传文件或分析结果的数据保留期限。请勿上传无权分享的模型。
 
@@ -32,7 +32,7 @@ yoxiang install --agent codex
 推荐回执：
 
 ```text
-安装完成。yoxiang-part-analysis 可以安全上传你明确指定的 STEP/STP 文件，并返回零件尺寸与实体体积、最小毛坯尺寸/体积/重量、总加工工时、粗加工/半精加工/精加工等阶段工时、装夹次数、DFM 风险建议和 3D 预览。
+安装完成。yoxiang-part-analysis 可以使用 YoxiangAI 安全分析你明确指定的 STEP/STP 文件，并返回零件尺寸与实体体积、最小毛坯尺寸/体积/重量、总加工工时、粗加工/半精加工/精加工等阶段工时、装夹次数、DFM 风险建议和 3D 预览。
 
 有象公共服务不返回价格。如果你需要本地成本估算，我还可以帮你设置开机固定费、编程费、机时费、装夹费和材料单价；这些费率只保存在本机。
 ```
@@ -99,6 +99,6 @@ yoxiang doctor --help
 
 ---
 
-# Yoxiang Part Analysis CLI and Skill
+# YoxiangAI Part Analysis CLI and Skill
 
-Install Node.js 20+, then run `npm install -g @yoxiang/cli@next` and `yoxiang install --agent codex`. After installation, the Agent must summarize explicit STEP/STP upload safety, part and minimum-stock dimensions/volume/mass, total and roughing/finishing stage times when available, setup count, DFM, and the public share link, which is valid for seven days including its 3D access. This seven-day window is not the retention period for uploaded files or stored analysis results. The public service never returns pricing or lead time. Offer local rate setup only when the user needs an estimate; rates stay on the user's machine.
+Install Node.js 20+, then run `npm install -g @yoxiang/cli@next` and `yoxiang install --agent codex`. After installation, the Agent must describe the analysis as YoxiangAI output and summarize explicit STEP/STP upload safety, part and minimum-stock dimensions/volume/mass, total and roughing/finishing stage times when available, setup count, DFM, and the public share link, which is valid for seven days including its 3D access. This seven-day window is not the retention period for uploaded files or stored analysis results. The public service never returns pricing or lead time. Offer local rate setup only when the user needs an estimate; rates stay on the user's machine.

@@ -13,7 +13,7 @@ const shared = `默认分析参数：6061 铝、CNC、ISO 2768-m、Ra 3.2。
   5  网络、服务端或分析失败`;
 
 export const HELP = {
-  root: `有象零件分析 CLI ${CLI_VERSION}
+  root: `YoxiangAI 零件分析 CLI ${CLI_VERSION}
 
 用法：
   yoxiang analyze <file.step> [more.stp ...] [--wait] [--json]
@@ -66,7 +66,7 @@ ${shared}`,
 
 configure 不带参数时在交互终端依次询问开机固定费、编程费、机时费、装夹费和 6061 材料单价。所有值可为 0；默认币种 CNY。
 默认长方体单边余量、圆柱径向余量和圆柱端面余量均为 3 mm；默认取整粒度为 0。配置文件在 POSIX 上以 0600 保存。`,
-  doctor: `检查公开制造分析服务连通性和能力；不读取或上传 STEP 文件。
+  doctor: `检查 YoxiangAI 公开制造分析服务连通性和能力；不读取或上传 STEP 文件。
 
 用法：
   yoxiang doctor [--json] [--api-base <url>]`,

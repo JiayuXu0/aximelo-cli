@@ -148,7 +148,7 @@ async function run(inputArgs: string[]): Promise<void> {
     process.stderr.write(`正在校验并提交 ${args.length} 个零件进行制造分析…\n`);
     let result = await client.submitBatch({ filePaths: args, material, process: processName, tolerance, surfaceRoughness });
     if (wait && !isBatchTerminal(result.status)) {
-      process.stderr.write(`批次 ${result.batch_id} 已提交，等待 Geometry、DFM、AutoCam 和预览…\n`);
+      process.stderr.write(`批次 ${result.batch_id} 已提交，YoxiangAI 正在分析几何、DFM、加工工时和预览…\n`);
       let previous = "";
       result = await client.waitBatch(result.batch_id, 10 * 60_000, (current) => {
         if (current.status !== previous) {
@@ -352,7 +352,7 @@ function formatUpdateCheck(check: { channel: UpdateChannel; current_ahead: boole
 }
 
 function formatDoctor(options: AnalysisOptions, apiBase: string): string {
-  return ["有象零件分析 CLI 状态正常", `API：${apiBase}`, `支持：${options.supported_extensions.join("、")}`, `单文件上限：${options.max_file_bytes.toLocaleString()} bytes（10 MiB）`, "服务端只返回制造分析，不返回价格或交期。"].join("\n");
+  return ["YoxiangAI 零件分析 CLI 状态正常", `API：${apiBase}`, `支持：${options.supported_extensions.join("、")}`, `单文件上限：${options.max_file_bytes.toLocaleString()} bytes（10 MiB）`, "服务端只返回制造分析，不返回价格或交期。"].join("\n");
 }
 
 function formatOptions(options: AnalysisOptions): string {
