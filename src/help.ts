@@ -1,9 +1,9 @@
-export const CLI_VERSION = "0.4.0-next.0";
+export const CLI_VERSION = "0.5.0";
 
 const shared = `默认分析参数：6061 铝、CNC、ISO 2768-m、Ra 3.2。
 限制：每个 STEP/STP 文件不超过 10 MiB；每批最多 5 个零件。
 安全：只上传命令中明确列出的文件；不接受目录或 glob，不扫描相邻文件。
-返回：几何、零件尺寸、最小毛坯、工时与阶段、装夹次数、DFM、3D 预览；不返回价格、交期或内部定价信息。
+返回：几何、零件尺寸、最小毛坯、H2 原始刀路工时与阶段、推荐/实际路线、三轴装夹次数、DFM、3D 预览；不返回平台价格、交期或内部定价信息。
 分享：公开结果链接及其中的 3D 访问有效 7 天；这不是上传文件或分析结果的数据保留期限。
 
 退出码：
@@ -25,9 +25,9 @@ export const HELP = {
   yoxiang cost-profile stock-adjustment set [options]
   yoxiang doctor
   yoxiang install --agent codex|claude|all
-  yoxiang update [--check] [--channel next|latest]
+  yoxiang update [--check]
 
-说明：服务端只做制造分析。报价由 Agent 使用本机 cost-profile 按固定公式计算，费率不会上传。
+说明：服务端只做制造分析。仅当实际采用路线是可执行三轴时，Agent 才能使用本机 cost-profile 按固定公式计算；五轴或人工报价路线不计算价格，费率不会上传。
 旧 yoxiang quote 已停用，调用时不发送网络请求并返回退出码 4。
 
 ${shared}`,
@@ -79,7 +79,7 @@ configure 不带参数时在交互终端依次询问开机固定费、编程费�
   update: `检查或更新 @yoxiang/cli，并刷新 yoxiang-part-analysis Skill。不会覆盖已有本地成本配置。
 
 用法：
-  yoxiang update [--check] [--channel next|latest] [--agent codex|claude|all] [--json]`,
+  yoxiang update [--check] [--agent codex|claude|all] [--json]`,
 } as const;
 
 export type HelpTopic = keyof typeof HELP;

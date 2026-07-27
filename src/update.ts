@@ -8,7 +8,7 @@ export const NPM_PACKAGE = "@yoxiang/cli";
 export const NPM_REGISTRY = "https://registry.npmjs.org";
 
 export type UpdateAgent = "codex" | "claude" | "all";
-export type UpdateChannel = "next" | "latest";
+export type UpdateChannel = "latest";
 
 export type UpdateCheck = {
   channel: UpdateChannel;

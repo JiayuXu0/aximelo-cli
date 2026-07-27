@@ -23,10 +23,10 @@ describe("CLI integration", () => {
     await expect(access(join(isolatedHome, ".codex"))).rejects.toBeDefined();
   });
 
-  it("prints version 0.4 without contacting the API", () => {
+  it("prints stable version 0.5 without contacting the API", () => {
     const result = spawnSync(process.execPath, ["dist/cli.js", "--version"], { cwd: process.cwd(), encoding: "utf8", env: { ...process.env, YOXIANG_API_BASE_URL: "http://127.0.0.1:1" } });
     expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe("0.4.0-next.0");
+    expect(result.stdout.trim()).toBe("0.5.0");
   });
 
   it("retires quote locally with exit code 4 and a migration message", () => {
@@ -48,7 +48,8 @@ describe("CLI integration", () => {
     expect(payload).toMatchObject({ ok: true, cost_profile: "missing" });
     expect(payload.capabilities).toContain("只上传明确指定的 STEP/STP 文件，不扫描目录或相邻文件");
     expect(payload.capabilities).toContain("最小毛坯形状/尺寸/体积/密度/重量");
-    expect(payload.capabilities).toContain("总加工工时与粗加工/半精加工/精加工等实际分阶段工时");
+    expect(payload.capabilities).toContain("H2 原始刀路总工时与粗加工/半精加工/精加工等实际分阶段工时");
+    expect(payload.capabilities).toContain("仅对实际采用的可执行三轴路线做本地透明成本估算");
     await expect(access(join(isolatedHome, ".codex", "skills", "yoxiang-part-analysis", "SKILL.md"))).resolves.toBeUndefined();
     await expect(access(join(configRoot, "yoxiang", "cost-profile.json"))).rejects.toBeDefined();
   });

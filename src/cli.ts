@@ -74,9 +74,9 @@ async function run(inputArgs: string[]): Promise<void> {
 
     if (command === "update") {
       const checkOnly = takeFlag(args, "--check");
-      const channel = takeOption(args, "--channel") ?? "next";
+      const channel = takeOption(args, "--channel") ?? "latest";
       const agent = takeOption(args, "--agent") ?? "codex";
-      if (!isUpdateChannel(channel)) throw new CliError("--channel 仅支持 next 或 latest。请运行 yoxiang update --help。", 4);
+      if (!isUpdateChannel(channel)) throw new CliError("正式版 CLI 仅支持 latest 更新通道。请运行 yoxiang update --help。", 4);
       if (!isAgent(agent)) throw new CliError("--agent 仅支持 codex、claude 或 all。请运行 yoxiang update --help。", 4);
       assertNoExtraArgs(args, "yoxiang update --help");
       try {
@@ -304,7 +304,7 @@ function isAgent(value: string): value is "codex" | "claude" | "all" {
 }
 
 function isUpdateChannel(value: string): value is UpdateChannel {
-  return value === "next" || value === "latest";
+  return value === "latest";
 }
 
 async function installSkill(agent: "codex" | "claude" | "all"): Promise<string[]> {
@@ -325,11 +325,11 @@ function atomicCapabilities(): string[] {
     "只上传明确指定的 STEP/STP 文件，不扫描目录或相邻文件",
     "零件长宽高、实体体积、表面积与复杂度",
     "最小毛坯形状/尺寸/体积/密度/重量",
-    "总加工工时与粗加工/半精加工/精加工等实际分阶段工时",
-    "装夹次数与估算等级",
+    "H2 原始刀路总工时与粗加工/半精加工/精加工等实际分阶段工时",
+    "三/五轴类别、H2 推荐路线、实际采用路线、时间口径与三轴装夹次数",
     "DFM findings/建议/关联 3D 节点",
     "3D 预览与缩略图",
-    "本地成本参数管理与透明估算",
+    "仅对实际采用的可执行三轴路线做本地透明成本估算",
   ];
 }
 
@@ -342,7 +342,7 @@ function formatInstall(paths: string[], profile: string, includeCapabilities: bo
     profile === "missing" ? `本地成本配置尚未创建：${costProfilePath()}` : `本地成本配置：${profile === "existing" ? "已保留" : "已创建"}`,
     profile === "missing"
       ? "如需本地成本估算，可继续配置开机固定费、编程费、机时费、装夹费和材料单价；费率只保存在本机。"
-      : "公共服务不返回价格；如需估算，由 Agent 使用本机费率透明计算。",
+      : "公共服务不返回平台价格；仅对实际采用的可执行三轴路线，Agent 才会使用本机费率透明计算。",
   ].join("\n");
 }
 
@@ -374,13 +374,25 @@ function formatPart(item: AnalysisResult): string[] {
     if (stock) lines.push(`- 最小毛坯：${stock.shape}，${Object.entries(stock.dimensions_mm).map(([key, value]) => `${key}=${value} mm`).join("，")}；${stock.volume_cm3} cm³ / ${stock.mass_kg} kg`);
   }
   if (item.machining) {
-    lines.push(`- 总加工工时：${item.machining.total_processing} 小时；装夹：${item.machining.setup_count ?? "未知"} 次；估算等级：${item.machining.estimate_grade ?? "未知"}`);
+    const route = item.machining.route;
+    lines.push(`- H2 原始刀路总工时：${item.machining.total_processing} 小时；估算等级：${item.machining.estimate_grade ?? "未知"}`);
+    if (route) {
+      lines.push(`- 加工类别：${routeLabel(route.machining_class)}；H2 推荐路线：${routeLabel(route.recommended_route?.route_class)}；实际采用路线：${route.manual_quote_required ? "需要人工报价" : routeLabel(route.selected_route?.route_class)}；时间口径：${route.time_basis}`);
+      if (route.selected_route?.route_class === "mill_3axis" && route.setup_count !== undefined) lines.push(`- 三轴装夹：${route.setup_count} 次`);
+      if (route.manual_quote_required) lines.push(`- 报价状态：需要人工报价；CLI/Skill 不计算本地价格${route.manual_quote_reason_codes?.length ? `（${route.manual_quote_reason_codes.join("、")}）` : ""}`);
+    } else {
+      lines.push("- 路线状态：旧结果未提供路线投影；为避免误报价，Skill 不应计算本地价格");
+    }
     for (const stage of item.machining.stages ?? []) lines.push(`  - ${stageLabel(stage.code)}：${stage.hours} 小时`);
   }
   const findings = publicFindings(item);
   if (findings.length) lines.push("- DFM 风险：", ...findings.map((finding) => `  - ${finding}`));
   for (const [name, component] of Object.entries(item.components)) if (component.status === "failed" || component.status === "unavailable") lines.push(`- ${name}：${component.status}${component.error_code ? ` (${component.error_code})` : ""}`);
   return lines;
+}
+
+function routeLabel(value: string | undefined): string {
+  return ({ mill_3axis: "三轴铣削", mill_5axis: "五轴铣削", mill_5axis_required: "必须五轴", mill_turn: "车铣复合" } as Record<string, string>)[value ?? ""] ?? value ?? "不可用";
 }
 
 function publicFindings(item: AnalysisResult): string[] {

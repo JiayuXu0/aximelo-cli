@@ -1,6 +1,6 @@
 ---
 name: yoxiang-part-analysis
-description: Analyze explicitly provided STEP/STP manufacturing parts with YoxiangAI and optionally calculate a local estimate from the user's saved cost profile. Use for part dimensions, minimum stock, machining time and stages, setup count, DFM, 3D preview, local cost estimates, or Yoxiang CLI installation/update requests.
+description: Analyze explicitly provided STEP/STP manufacturing parts with YoxiangAI H2 route projections and optionally calculate a local estimate only for an executable selected three-axis route using the user's saved cost profile. Use for part dimensions, minimum stock, raw toolpath time and stages, three/five-axis classification and route selection, three-axis setup count, DFM, 3D preview, local cost estimates, or Yoxiang CLI installation/update requests.
 ---
 
 # YoxiangAI Part Analysis
@@ -12,7 +12,7 @@ Use the YoxiangAI public service for manufacturing analysis only. It never retur
 - Analyze one to five explicitly named STEP/STP files in one batch.
 - Read part bounding-box dimensions, solid volume, surface area, and complexity.
 - Read minimum stock shape, dimensions, volume, density, and mass.
-- Read total machining time, stage times, setup count, and estimate grade.
+- Read H2 raw toolpath total/stage times, machining class, recommended route, selected route, time basis, three-axis setup count, and estimate grade.
 - Read structured DFM findings, suggestions, and associated 3D node IDs.
 - Read 3D preview and thumbnail state and links.
 - Configure/show local fixed fees, hourly/setup rates, material prices, and stock adjustments.
@@ -41,6 +41,14 @@ yoxiang analyze "/exact/path/a.step" "/exact/path/b.stp" --wait --json
 Add `--material`, `--process`, `--tolerance`, or `--surface-roughness` only when the user explicitly overrides a default. Do not run `doctor` or `analyze options` first. Use `doctor` only after installation or connection failure; use `analyze options` only when an explicit non-default value cannot be mapped.
 
 DFM warnings do not block machining-time analysis or a local cost estimate. Mark the risk prominently. Preserve `geometry`, `dfm`, `machining`, and `preview` component statuses independently when the batch is `completed_with_gaps`.
+
+Treat `machining.total_processing` and every `machining.stages[].hours` value as H2 raw toolpath time. Use `machining.route` as the route authority:
+
+- Show `machining_class`, `recommended_route`, `selected_route`, and `time_basis` without rewriting the H2 recommendation.
+- When H2 recommends five-axis but `selected_route.route_class` is `mill_3axis`, explain that the platform selected the executable three-axis alternative and keep the five-axis recommendation visible.
+- Show `setup_count` only when the selected route is executable `mill_3axis`.
+- When `manual_quote_required` is true, or no selected executable three-axis route exists, show the manual reason codes and never invent a setup count or price.
+- Treat a legacy result without `machining.route` as analysis-only; do not calculate a local price from it.
 
 ## Local cost profile
 
@@ -91,6 +99,8 @@ Show both minimum and adjusted stock dimensions whenever an adjustment is applie
 
 ## Cost formula
 
+Before calculating, require all of the following: `machining.route.manual_quote_required == false`, `selected_route.route_class == mill_3axis`, `selected_route.toolpath_executable == true`, and a positive integer `setup_count`. If any check fails, stop the cost calculation and state that the route needs manual quotation or lacks executable three-axis proof.
+
 For each design and requested quantity `q`, calculate:
 
 ```text
@@ -114,7 +124,7 @@ total = startup_fee_per_design
 
 1. Public share link validity (seven days) and preview availability.
 2. Per-part dimensions, solid volume, surface area, complexity, and minimum stock.
-3. Total/stage machining time, setup count, and estimate grade.
+3. H2 raw total/stage toolpath time, machining class, H2 recommendation, selected route, time basis, and three-axis setup count when applicable.
 4. Prominent DFM findings and any component gaps.
 5. When price was requested: per-design local cost inputs and breakdown, quantity, final two-decimal total, then batch total.
 
@@ -125,7 +135,7 @@ Never describe the locally calculated amount as a price returned or approved by 
 Install or refresh the Skill only when requested:
 
 ```bash
-npm install -g @yoxiang/cli@next
+npm install -g @yoxiang/cli@latest
 yoxiang install --agent codex
 ```
 
@@ -135,7 +145,7 @@ After a successful install, respond in the user's current language and do not me
 
 - Upload only explicitly named STEP/STP files without scanning directories or adjacent files.
 - Return part dimensions and solid volume, plus minimum-stock shape, dimensions, volume, density, and mass.
-- Return total machining time and the actual roughing, semi-finishing, finishing, holemaking, or other stage times present in the result; never promise or invent a missing stage.
-- Return setup count, estimate grade, structured DFM risks/suggestions, and 3D preview/thumbnail links.
+- Return H2 raw total machining time and the actual roughing, semi-finishing, finishing, holemaking, or other stage times present in the result; never promise or invent a missing stage.
+- Return three/five-axis classification, H2 recommended route, selected route, time basis, three-axis setup count when applicable, estimate grade, structured DFM risks/suggestions, and 3D preview/thumbnail links.
 
 Also state that the public service returns no price. If the cost profile is missing, offer to configure startup, programming, machine-hour, setup, and material rates only when the user wants a local estimate. Rates stay on the user's machine. Do not block the installation-complete response by asking for rates when no estimate was requested.

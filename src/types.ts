@@ -56,12 +56,38 @@ export interface AnalysisDfm {
   findings: DfmFinding[];
 }
 
+export interface AutoCamRoute {
+  process_family: "milling" | "turning" | "mill_turn";
+  kinematics: string;
+  route_class: "mill_3axis" | "mill_5axis" | "mill_turn";
+  time_basis: string;
+  toolpath_executable: boolean;
+  estimated_seconds: number;
+  required_region_coverage: number;
+  reason_codes: string[];
+  setup_count?: number;
+  reclamp_count?: number;
+}
+
+export interface AutoCamRouteProjection {
+  machining_class: "mill_3axis" | "mill_5axis_required";
+  recommended_route?: AutoCamRoute;
+  selected_route?: AutoCamRoute;
+  route_options?: AutoCamRoute[];
+  time_basis: string;
+  toolpath_executable: boolean;
+  setup_count?: number;
+  manual_quote_required: boolean;
+  manual_quote_reason_codes?: string[];
+}
+
 export interface MachiningTime {
   source?: "autocam";
-  setup_count: number;
+  setup_count?: number;
   estimate_grade?: string;
   stages?: Array<{ code: string; hours: number }>;
   total_processing: number;
+  route?: AutoCamRouteProjection;
 }
 
 export interface MinimumStock {

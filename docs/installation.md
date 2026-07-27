@@ -1,6 +1,6 @@
 # YoxiangAI 零件分析 CLI 与 Skill 安装指南
 
-`@yoxiang/cli` 把明确指定的 STEP/STP 文件提交给 YoxiangAI 制造分析服务，返回零件尺寸、实体体积、表面积、复杂度、最小毛坯、加工总工时与阶段、装夹次数、DFM 和 3D 预览。公共服务不返回价格、交期或内部定价信息。
+`@yoxiang/cli` 把明确指定的 STEP/STP 文件提交给 YoxiangAI 制造分析服务，返回零件尺寸、实体体积、表面积、复杂度、最小毛坯、H2 原始刀路总工时与阶段、三/五轴类别、推荐路线、实际采用路线、三轴装夹次数、DFM 和 3D 预览。公共服务不返回平台价格、交期或内部定价信息。
 
 > 公开结果分享链接及其中的 3D 访问有效 7 天；这不是上传文件或分析结果的数据保留期限。请勿上传无权分享的模型。
 
@@ -9,7 +9,7 @@
 需要 Node.js 20 或更高版本：
 
 ```bash
-npm install -g @yoxiang/cli@next
+npm install -g @yoxiang/cli@latest
 yoxiang install --agent codex
 ```
 
@@ -24,17 +24,18 @@ yoxiang install --agent codex
 1. 只上传用户明确指定的 STEP/STP 文件，不扫描目录或相邻文件；每批最多 5 个，每个最大 10 MiB。
 2. 返回零件长宽高、实体体积、表面积和复杂度。
 3. 返回最小毛坯形状、尺寸、体积、材料密度和重量。
-4. 返回总加工工时，以及服务端实际提供的粗加工、半精加工、精加工、孔加工等分阶段工时；缺少某个阶段时应说明缺失，不得编造。
-5. 返回装夹次数、估算等级、结构化 DFM 风险与建议，以及 3D 预览和缩略图链接。
+4. 返回 H2 原始刀路总工时，以及服务端实际提供的粗加工、半精加工、精加工、孔加工等分阶段工时；缺少某个阶段时应说明缺失，不得编造。
+5. 返回三/五轴类别、H2 推荐路线、实际采用路线、时间口径；仅三轴可执行路线显示装夹次数，五轴/人工报价路线不得编造装夹次数或价格。
+6. 返回估算等级、结构化 DFM 风险与建议，以及 3D 预览和缩略图链接。
 
 安装完成后还要提醒用户：公共服务不返回价格或交期。如果用户需要本地成本估算，可以继续配置开机固定费、编程费、机时费、装夹费和材料单价；费率只保存在用户本机。用户没有要求估价时，只做一次可选提醒，不要阻塞追问费率。
 
 推荐回执：
 
 ```text
-安装完成。yoxiang-part-analysis 可以使用 YoxiangAI 安全分析你明确指定的 STEP/STP 文件，并返回零件尺寸与实体体积、最小毛坯尺寸/体积/重量、总加工工时、粗加工/半精加工/精加工等阶段工时、装夹次数、DFM 风险建议和 3D 预览。
+安装完成。yoxiang-part-analysis 可以使用 YoxiangAI 安全分析你明确指定的 STEP/STP 文件，并返回零件尺寸与实体体积、最小毛坯尺寸/体积/重量、H2 原始刀路总工时与阶段工时、三/五轴类别、推荐路线与实际采用路线、三轴装夹次数、DFM 风险建议和 3D 预览。
 
-有象公共服务不返回价格。如果你需要本地成本估算，我还可以帮你设置开机固定费、编程费、机时费、装夹费和材料单价；这些费率只保存在本机。
+有象公共服务不返回平台价格。如果实际采用路线是可执行三轴且你需要本地成本估算，我还可以帮你设置开机固定费、编程费、机时费、装夹费和材料单价；这些费率只保存在本机。五轴或人工报价路线不计算本地价格。
 ```
 
 ## 原子能力
@@ -75,7 +76,7 @@ yoxiang cost-profile stock-adjustment set --block-allowance-per-side-mm 2 --roun
 
 长方体单边余量、圆柱径向余量和圆柱端面余量默认均为 `3 mm`，默认不取整。即长方体长宽高各增加 `6 mm`，圆柱直径和长度各增加 `6 mm`。可分别修改三种余量和尺寸向上取整粒度。CLI/Skill 更新不会覆盖现有配置；新建成本配置采用上述默认值。
 
-Agent 使用固定公式直接计算，不调用本地或服务端报价引擎：
+Agent 仅在实际采用路线是可执行三轴、`manual_quote_required=false` 且有有效装夹次数时使用固定公式直接计算，不调用本地或服务端报价引擎。五轴、人工报价或缺少路线证明的结果不计算本地价格：
 
 ```text
 总价 = 开机固定费 + 编程费
@@ -101,4 +102,4 @@ yoxiang doctor --help
 
 # YoxiangAI Part Analysis CLI and Skill
 
-Install Node.js 20+, then run `npm install -g @yoxiang/cli@next` and `yoxiang install --agent codex`. After installation, the Agent must describe the analysis as YoxiangAI output and summarize explicit STEP/STP upload safety, part and minimum-stock dimensions/volume/mass, total and roughing/finishing stage times when available, setup count, DFM, and the public share link, which is valid for seven days including its 3D access. This seven-day window is not the retention period for uploaded files or stored analysis results. The public service never returns pricing or lead time. Offer local rate setup only when the user needs an estimate; rates stay on the user's machine.
+Install Node.js 20+, then run `npm install -g @yoxiang/cli@latest` and `yoxiang install --agent codex`. After installation, the Agent must describe the analysis as YoxiangAI output and summarize explicit STEP/STP upload safety, part and minimum-stock dimensions/volume/mass, H2 raw total and stage times, machining class, recommended and selected routes, three-axis setup count when applicable, DFM, and the public share link, which is valid for seven days including its 3D access. This seven-day window is not the retention period for uploaded files or stored analysis results. The public service never returns platform pricing or lead time. Local pricing is allowed only for a selected executable three-axis route; five-axis or manual routes must not produce a local price. Rates stay on the user's machine.

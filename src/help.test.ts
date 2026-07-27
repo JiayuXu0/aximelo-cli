@@ -10,7 +10,8 @@ describe("hierarchical help", () => {
   ])("resolves %j", (argv, topic) => expect(resolveHelp(argv)).toBe(topic));
 
   it("documents analysis-only behavior and local rates", () => {
-    expect(HELP.root).toContain("不返回价格、交期");
+    expect(HELP.root).toContain("不返回平台价格、交期");
+    expect(HELP.root).toContain("五轴或人工报价路线不计算价格");
     expect(HELP.root).toContain("cost-profile");
     expect(HELP.install).toContain("cost_profile: missing");
     expect(HELP.costProfile).toContain("0600");

@@ -7,35 +7,35 @@ import { checkForUpdate, compareVersions, installGlobalUpdate } from "./update.j
 
 describe("CLI version comparison", () => {
   it.each([
-    ["0.2.0-next.1", "0.2.0-next.0", 1],
-    ["0.2.0", "0.2.0-next.9", 1],
-    ["0.2.0-next.0", "0.2.0-next.0", 0],
-    ["0.1.0-next.0", "0.2.0-next.0", -1],
+    ["0.5.1", "0.5.0", 1],
+    ["0.5.0", "0.5.0-alpha.9", 1],
+    ["0.5.0", "0.5.0", 0],
+    ["0.4.9", "0.5.0", -1],
     ["1.0.0-alpha.2", "1.0.0-alpha.10", -1],
   ])("compares %s and %s", (left, right, expected) => {
     expect(compareVersions(left, right)).toBe(expected);
   });
 
   it("rejects invalid semantic versions", () => {
-    expect(() => compareVersions("next", "0.2.0")).toThrow("invalid semantic version");
+    expect(() => compareVersions("stable", "0.5.0")).toThrow("invalid semantic version");
   });
 
   it("checks the selected npm dist-tag without installing", async () => {
     const server = createServer((_request, response) => {
       response.setHeader("content-type", "application/json");
-      response.end(JSON.stringify({ "dist-tags": { next: "0.2.0-next.1" } }));
+      response.end(JSON.stringify({ "dist-tags": { latest: "0.5.1" } }));
     });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("test server failed to listen");
     try {
       await expect(
-        checkForUpdate("0.2.0-next.0", "next", `http://127.0.0.1:${address.port}`),
+        checkForUpdate("0.5.0", "latest", `http://127.0.0.1:${address.port}`),
       ).resolves.toEqual({
-        channel: "next",
+        channel: "latest",
         current_ahead: false,
-        current_version: "0.2.0-next.0",
-        target_version: "0.2.0-next.1",
+        current_version: "0.5.0",
+        target_version: "0.5.1",
         update_available: true,
       });
     } finally {
@@ -63,17 +63,17 @@ describe("CLI version comparison", () => {
     await chmod(join(bin, "npm"), 0o755);
     await writeFile(
       updatedCLI,
-      `import { appendFileSync } from "node:fs";\nappendFileSync(${JSON.stringify(invocationLog)}, process.argv.slice(2).join(" ") + "\\n");\nif (process.argv.includes("--version")) process.stdout.write("0.2.0-next.1\\n");\nelse process.stdout.write('{"ok":true}\\n');\n`,
+      `import { appendFileSync } from "node:fs";\nappendFileSync(${JSON.stringify(invocationLog)}, process.argv.slice(2).join(" ") + "\\n");\nif (process.argv.includes("--version")) process.stdout.write("0.5.1\\n");\nelse process.stdout.write('{"ok":true}\\n');\n`,
       "utf8",
     );
     const previousPath = process.env.PATH;
     process.env.PATH = `${bin}:${previousPath ?? ""}`;
     try {
-      await expect(installGlobalUpdate("next", "codex", "https://registry.example")).resolves.toBe(
-        "0.2.0-next.1",
+      await expect(installGlobalUpdate("latest", "codex", "https://registry.example")).resolves.toBe(
+        "0.5.1",
       );
       expect(await readFile(npmLog, "utf8")).toContain(
-        "install --global @yoxiang/cli@next --registry=https://registry.example",
+        "install --global @yoxiang/cli@latest --registry=https://registry.example",
       );
       expect(await readFile(invocationLog, "utf8")).toContain("install --agent codex --json");
     } finally {
