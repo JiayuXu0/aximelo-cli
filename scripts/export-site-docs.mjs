@@ -22,7 +22,7 @@ const manifest = {
   cli: {
     package: packageJson.name,
     version: packageJson.version,
-    dist_tag: "next",
+    dist_tag: "latest",
   },
   source: {
     repository: "https://github.com/JiayuXu0/yoxiang-quote-cli",
