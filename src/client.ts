@@ -6,6 +6,7 @@ import type {
   AnalysisBatchResult,
   AnalysisBatchUploadIntent,
   AnalysisOptions,
+  StockInput,
 } from "./types.js";
 
 export const DEFAULT_API_BASE_URL = "https://quote-test-api.yoxiang.cn";
@@ -37,6 +38,7 @@ export interface SubmitAnalysisInput {
   process?: string;
   tolerance?: string;
   surfaceRoughness?: string;
+  stock?: StockInput;
 }
 
 interface ClientOptions {
@@ -84,6 +86,7 @@ export class AnalysisClient {
           file_size: file.size,
           checksum: `sha256:${file.sha256}`,
           content_type: "model/step",
+          ...(normalized.stock ? { stock: normalized.stock } : {}),
         })),
         material: normalized.material,
         process: normalized.process,
@@ -220,14 +223,36 @@ export function isBatchTerminal(status: AnalysisBatchResult["status"]): boolean 
   return ["completed", "completed_with_gaps", "failed", "expired"].includes(status);
 }
 
-function normalizeInput(input: SubmitAnalysisInput): Required<Omit<SubmitAnalysisInput, "filePaths">> {
+function normalizeInput(input: SubmitAnalysisInput): {
+  material: string;
+  process: string;
+  tolerance: string;
+  surfaceRoughness: string;
+  stock?: StockInput;
+} {
   const process = normalizeProcess(input.process ?? DEFAULT_ANALYSIS_INPUT.process);
   return {
     material: input.material?.trim() || DEFAULT_ANALYSIS_INPUT.material,
     process,
     tolerance: input.tolerance?.trim() || DEFAULT_ANALYSIS_INPUT.tolerance,
     surfaceRoughness: input.surfaceRoughness?.trim() || DEFAULT_ANALYSIS_INPUT.surfaceRoughness,
+    stock: normalizeStock(input.stock),
   };
+}
+
+function normalizeStock(stock: StockInput | undefined): StockInput | undefined {
+  if (!stock) return undefined;
+  const positive = (value: number): boolean => Number.isFinite(value) && value > 0;
+  if (stock.shape === "block") {
+    if (stock.size_mm.length !== 3 || !stock.size_mm.every(positive)) {
+      throw new CliError("--stock-box 的三个尺寸必须是大于 0 的有限数字。", 4);
+    }
+    return { shape: "block", size_mm: [...stock.size_mm] as [number, number, number] };
+  }
+  if (!positive(stock.diameter_mm) || !positive(stock.length_mm)) {
+    throw new CliError("--stock-cylinder 的直径和长度必须是大于 0 的有限数字。", 4);
+  }
+  return { ...stock };
 }
 
 function normalizeProcess(value: string): string {

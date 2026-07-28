@@ -1,6 +1,6 @@
 {
   "name": "@yoxiang/cli",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Public CLI and agent skill for YoxiangAI STEP part manufacturing analysis",
   "type": "module",
   "bin": {

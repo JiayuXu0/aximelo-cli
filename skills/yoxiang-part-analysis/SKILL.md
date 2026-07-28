@@ -12,6 +12,7 @@ Use the YoxiangAI public service for manufacturing analysis only. It never retur
 - Analyze one to five explicitly named STEP/STP files in one batch.
 - Read part bounding-box dimensions, solid volume, surface area, and complexity.
 - Read minimum stock shape, dimensions, volume, density, and mass.
+- Submit a known block or cylindrical blank and read its declared dimensions, resolved orientation, containment proof, actual volume, and mass separately from minimum stock.
 - Read H2 raw toolpath total/stage times, machining class, recommended route, selected route, time basis, three-axis setup count, and estimate grade.
 - Read structured DFM findings, suggestions, and associated 3D node IDs.
 - Read 3D preview and thumbnail state and links.
@@ -25,6 +26,7 @@ Use the YoxiangAI public service for manufacturing analysis only. It never retur
 - Each file must be `.step` or `.stp` and no larger than 10 MiB (10,485,760 bytes).
 - Use at most five files per batch. For more than five explicit files, submit sequential groups; never fan out parallel CLI processes.
 - Defaults are material `6061`, process `cnc-machining`, tolerance `ISO2768-m`, and roughness `Ra3.2`. Do not ask about omitted manufacturing parameters.
+- When the user, workbook, drawing, or another authoritative source gives the blank, pass it explicitly. Never omit a known blank and never replace a missing or invalid blank with minimum/derived stock when reproducing a labeled evaluation.
 - Do not call ERP, debug, internal quote, or retired public quote endpoints. Do not expose internal algorithms, traces, storage paths, or rules.
 - Present machining results to the user as YoxiangAI output. Never repeat an internal producer name from a raw `source` value or error code.
 - Treat the output and any locally calculated cost as an estimate, not an order or binding offer.
@@ -38,9 +40,29 @@ For up to five exact paths, run the analysis exactly once:
 yoxiang analyze "/exact/path/a.step" "/exact/path/b.stp" --wait --json
 ```
 
+For known block dimensions, their order is nominal and does not assert X/Y/Z. AutoCam resolves the enclosing axis permutation:
+
+```bash
+yoxiang analyze "/exact/path/a.step" --stock-box 20 868 175 --wait --json
+```
+
+For known cylindrical stock:
+
+```bash
+yoxiang analyze "/exact/path/b.step" --stock-cylinder 60 25 --wait --json
+```
+
+`--stock-box` and `--stock-cylinder` are mutually exclusive. One stock flag applies to every explicitly listed file in that CLI invocation, so split the batch when files have different blanks. If the explicit blank does not contain the part, report `AUTOCAM_INVALID_STOCK`; do not retry without the blank.
+
 Add `--material`, `--process`, `--tolerance`, or `--surface-roughness` only when the user explicitly overrides a default. Do not run `doctor` or `analyze options` first. Use `doctor` only after installation or connection failure; use `analyze options` only when an explicit non-default value cannot be mapped.
 
 DFM warnings do not block machining-time analysis or a local cost estimate. Mark the risk prominently. Preserve `geometry`, `dfm`, `machining`, and `preview` component statuses independently when the batch is `completed_with_gaps`.
+
+Keep the stock meanings separate:
+
+- `geometry.minimum_stock` is the geometry-derived minimum envelope.
+- `machining.stock` is the blank actually used by AutoCam. Show `source`, `input_size_mm`, `resolved_size_mm`, `axis`, and `envelope_contains_part`.
+- For a provided block, preserve `input_size_mm` order and use `resolved_size_mm` to explain the selected X/Y/Z permutation. Do not reorder the user's declared value in the request.
 
 Treat `machining.total_processing` and every `machining.stages[].hours` value as H2 raw toolpath time. Use `machining.route` as the route authority:
 
@@ -86,6 +108,8 @@ Never infer or invent a rate. Updating the CLI or Skill must not replace an exis
 
 Unless the user explicitly configures other values, use these defaults: `block_allowance_per_side_mm = 3`, `cylinder_radial_allowance_mm = 3`, `cylinder_end_allowance_mm = 3`, and `round_up_mm = 0`. Thus a block gains `6 mm` on every dimension; a cylinder gains `6 mm` on both diameter and length. Recompute adjusted stock volume and mass without early rounding.
 
+When `machining.stock.source == provided`, it is already the actual blank: use its `mass_kg` for material cost and do not add the local minimum-stock adjustment again. Apply the adjustment rules below only when calculating from `geometry.minimum_stock` because no provided machining blank exists.
+
 Apply the stored adjustments as follows:
 
 - Block: add twice `block_allowance_per_side_mm` to each of length, width, and height.
@@ -123,7 +147,7 @@ total = startup_fee_per_design
 ## Response order
 
 1. Public share link validity (seven days) and preview availability.
-2. Per-part dimensions, solid volume, surface area, complexity, and minimum stock.
+2. Per-part dimensions, solid volume, surface area, complexity, geometry minimum stock, then actual machining stock with input/resolved direction.
 3. H2 raw total/stage toolpath time, machining class, H2 recommendation, selected route, time basis, and three-axis setup count when applicable.
 4. Prominent DFM findings and any component gaps.
 5. When price was requested: per-design local cost inputs and breakdown, quantity, final two-decimal total, then batch total.
@@ -144,7 +168,7 @@ Use `--agent claude` or `--agent all` only when named. For updates run `yoxiang 
 After a successful install, respond in the user's current language and do not merely say that installation finished. Summarize these capabilities:
 
 - Upload only explicitly named STEP/STP files without scanning directories or adjacent files.
-- Return part dimensions and solid volume, plus minimum-stock shape, dimensions, volume, density, and mass.
+- Return part dimensions and solid volume, plus geometry minimum-stock facts and the separate actual machining-stock source/input/resolved direction/volume/mass.
 - Return H2 raw total machining time and the actual roughing, semi-finishing, finishing, holemaking, or other stage times present in the result; never promise or invent a missing stage.
 - Return three/five-axis classification, H2 recommended route, selected route, time basis, three-axis setup count when applicable, estimate grade, structured DFM risks/suggestions, and 3D preview/thumbnail links.
 

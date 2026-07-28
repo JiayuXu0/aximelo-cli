@@ -69,7 +69,7 @@ describe("AnalysisClient", () => {
       .mockResolvedValueOnce(jsonResponse(batchResult("b1", "processing"), 202));
     const client = new AnalysisClient({ baseUrl: "https://api.example.test", fetchImpl });
 
-    await expect(client.submitBatch({ filePaths: [first, second], process: "cnc" })).resolves.toMatchObject({
+    await expect(client.submitBatch({ filePaths: [first, second], process: "cnc", stock: { shape: "block", size_mm: [20, 868, 175] } })).resolves.toMatchObject({
       batch_id: "b1",
       result_url: "https://test.yoxiang.cn/zh/tools/part-analysis/results/b1",
     });
@@ -79,6 +79,10 @@ describe("AnalysisClient", () => {
     const body = JSON.parse(String(init?.body));
     expect(body).toMatchObject({ material: "6061", process: "cnc-machining", tolerance: "ISO2768-m", surface_roughness: "Ra3.2" });
     expect(body.files.map((file: { file_name: string }) => file.file_name)).toEqual(["first.step", "second.stp"]);
+    expect(body.files.map((file: { stock: unknown }) => file.stock)).toEqual([
+      { shape: "block", size_mm: [20, 868, 175] },
+      { shape: "block", size_mm: [20, 868, 175] },
+    ]);
     expect(body).not.toHaveProperty("quantity");
     expect(body).not.toHaveProperty("surface_finish");
     expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain("adjacent.step");
@@ -94,6 +98,19 @@ describe("AnalysisClient", () => {
     const fetchImpl = vi.fn<typeof fetch>();
     const client = new AnalysisClient({ baseUrl: "https://api.example.test", fetchImpl });
     await expect(client.submitBatch({ filePaths: [good, bad] })).rejects.toMatchObject({ exitCode: 4 });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid explicit stock before any request", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "yoxiang-analysis-stock-"));
+    const file = join(directory, "part.step");
+    await writeFile(file, "ISO-10303-21;");
+    const fetchImpl = vi.fn<typeof fetch>();
+    const client = new AnalysisClient({ baseUrl: "https://api.example.test", fetchImpl });
+    await expect(client.submitBatch({
+      filePaths: [file],
+      stock: { shape: "cylinder", diameter_mm: 60, length_mm: 0 },
+    })).rejects.toMatchObject({ exitCode: 4 });
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 

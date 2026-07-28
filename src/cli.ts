@@ -22,7 +22,7 @@ import {
   type CostProfile,
 } from "./cost-profile.js";
 import { CLI_VERSION, HELP, resolveHelp } from "./help.js";
-import type { AnalysisBatchResult, AnalysisOptions, AnalysisResult } from "./types.js";
+import type { AnalysisBatchResult, AnalysisOptions, AnalysisResult, StockInput } from "./types.js";
 import { checkForUpdate, installGlobalUpdate, type UpdateChannel } from "./update.js";
 
 const rawArgs = process.argv.slice(2);
@@ -139,6 +139,16 @@ async function run(inputArgs: string[]): Promise<void> {
     const processName = takeOption(args, "--process");
     const tolerance = takeOption(args, "--tolerance");
     const surfaceRoughness = takeOption(args, "--surface-roughness");
+    const stockBox = takePositiveTuple(args, "--stock-box", 3);
+    const stockCylinder = takePositiveTuple(args, "--stock-cylinder", 2);
+    if (stockBox && stockCylinder) {
+      throw new CliError("--stock-box 与 --stock-cylinder 互斥，只能指定一种毛坯。", 4);
+    }
+    const stock: StockInput | undefined = stockBox
+      ? { shape: "block", size_mm: stockBox as [number, number, number] }
+      : stockCylinder
+        ? { shape: "cylinder", diameter_mm: stockCylinder[0]!, length_mm: stockCylinder[1]! }
+        : undefined;
     const wait = takeFlag(args, "--wait");
     if (args.some((arg) => arg.startsWith("-"))) {
       throw new CliError(`无法识别参数：${args.filter((arg) => arg.startsWith("-")).join(" ")}。请运行 yoxiang analyze --help。`, 4);
@@ -146,7 +156,7 @@ async function run(inputArgs: string[]): Promise<void> {
     if (args.length === 0) throw new CliError("analyze 需要至少一个明确的 STEP/STP 文件路径。请运行 yoxiang analyze --help。", 4);
 
     process.stderr.write(`正在校验并提交 ${args.length} 个零件进行制造分析…\n`);
-    let result = await client.submitBatch({ filePaths: args, material, process: processName, tolerance, surfaceRoughness });
+    let result = await client.submitBatch({ filePaths: args, material, process: processName, tolerance, surfaceRoughness, stock });
     if (wait && !isBatchTerminal(result.status)) {
       process.stderr.write(`批次 ${result.batch_id} 已提交，YoxiangAI 正在分析几何、DFM、加工工时和预览…\n`);
       let previous = "";
@@ -281,6 +291,18 @@ function takeOption(argv: string[], name: string): string | undefined {
   return value;
 }
 
+function takePositiveTuple(argv: string[], name: string, count: number): number[] | undefined {
+  const index = argv.indexOf(name);
+  if (index < 0) return undefined;
+  const raw = argv.slice(index + 1, index + 1 + count);
+  const values = raw.map(Number);
+  if (raw.length !== count || values.some((value) => !Number.isFinite(value) || value <= 0)) {
+    throw new CliError(`${name} 需要 ${count} 个大于 0 的有限数字。`, 4);
+  }
+  argv.splice(index, count + 1);
+  return values;
+}
+
 function optionalNumber(argv: string[], name: string): number | undefined {
   const raw = takeOption(argv, name);
   if (raw === undefined) return undefined;
@@ -325,6 +347,7 @@ function atomicCapabilities(): string[] {
     "只上传明确指定的 STEP/STP 文件，不扫描目录或相邻文件",
     "零件长宽高、实体体积、表面积与复杂度",
     "最小毛坯形状/尺寸/体积/密度/重量",
+    "显式方料/圆料输入，以及实际加工毛坯的输入尺寸、解析方向和质量",
     "H2 原始刀路总工时与粗加工/半精加工/精加工等实际分阶段工时",
     "三/五轴类别、H2 推荐路线、实际采用路线、时间口径与三轴装夹次数",
     "DFM findings/建议/关联 3D 节点",
@@ -375,6 +398,10 @@ function formatPart(item: AnalysisResult): string[] {
   }
   if (item.machining) {
     const route = item.machining.route;
+    const machiningStock = item.machining.stock;
+    if (machiningStock) {
+      lines.push(`- 实际加工毛坯：${machiningStock.shape}（${machiningStock.source}）；输入 ${machiningStock.input_size_mm.join(" × ")} mm；解析 ${machiningStock.resolved_size_mm.join(" × ")} mm；轴向 [${machiningStock.axis.join(", ")}]；包络${machiningStock.envelope_contains_part ? "通过" : "失败"}`);
+    }
     lines.push(`- H2 原始刀路总工时：${item.machining.total_processing} 小时；估算等级：${item.machining.estimate_grade ?? "未知"}`);
     if (route) {
       lines.push(`- 加工类别：${routeLabel(route.machining_class)}；H2 推荐路线：${routeLabel(route.recommended_route?.route_class)}；实际采用路线：${route.manual_quote_required ? "需要人工报价" : routeLabel(route.selected_route?.route_class)}；时间口径：${route.time_basis}`);

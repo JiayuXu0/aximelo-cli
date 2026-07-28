@@ -12,6 +12,7 @@ export interface AnalysisOptions {
   tolerances?: Array<{ value: string; label: string }>;
   max_file_bytes: number;
   supported_extensions: string[];
+  supported_stock_shapes?: Array<"block" | "cylinder">;
   defaults?: {
     material: string;
     process: string;
@@ -19,6 +20,23 @@ export interface AnalysisOptions {
     surface_roughness: string;
   };
   capabilities?: Record<string, boolean | number | null>;
+}
+
+export type StockInput =
+  | { shape: "block"; size_mm: [number, number, number] }
+  | { shape: "cylinder"; diameter_mm: number; length_mm: number };
+
+export interface MachiningStock {
+  shape: "block" | "cylinder" | "profile";
+  source: "provided" | "derived";
+  input_size_mm: [number, number, number];
+  resolved_size_mm: [number, number, number];
+  axis: [number, number, number];
+  diameter_mm?: number;
+  length_mm?: number;
+  envelope_contains_part: boolean;
+  volume_cm3: number;
+  mass_kg: number;
 }
 
 export interface AnalysisUploadIntent {
@@ -88,6 +106,7 @@ export interface MachiningTime {
   stages?: Array<{ code: string; hours: number }>;
   total_processing: number;
   route?: AutoCamRouteProjection;
+  stock?: MachiningStock;
 }
 
 export interface MinimumStock {

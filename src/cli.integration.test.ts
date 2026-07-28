@@ -23,10 +23,18 @@ describe("CLI integration", () => {
     await expect(access(join(isolatedHome, ".codex"))).rejects.toBeDefined();
   });
 
-  it("prints stable version 0.5 without contacting the API", () => {
+  it("prints stable version 0.6 without contacting the API", () => {
     const result = spawnSync(process.execPath, ["dist/cli.js", "--version"], { cwd: process.cwd(), encoding: "utf8", env: { ...process.env, YOXIANG_API_BASE_URL: "http://127.0.0.1:1" } });
     expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe("0.5.0");
+    expect(result.stdout.trim()).toBe("0.6.0");
+  });
+
+  it("rejects mutually exclusive stock flags before file or network access", () => {
+    const result = spawnSync(process.execPath, ["dist/cli.js", "analyze", "missing.step", "--stock-box", "20", "30", "40", "--stock-cylinder", "60", "25"], {
+      cwd: process.cwd(), encoding: "utf8", env: { ...process.env, YOXIANG_API_BASE_URL: "http://127.0.0.1:1" },
+    });
+    expect(result.status).toBe(4);
+    expect(result.stderr).toContain("互斥");
   });
 
   it("retires quote locally with exit code 4 and a migration message", () => {

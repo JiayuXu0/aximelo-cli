@@ -1,9 +1,9 @@
-export const CLI_VERSION = "0.5.0";
+export const CLI_VERSION = "0.6.0";
 
 const shared = `默认分析参数：6061 铝、CNC、ISO 2768-m、Ra 3.2。
 限制：每个 STEP/STP 文件不超过 10 MiB；每批最多 5 个零件。
 安全：只上传命令中明确列出的文件；不接受目录或 glob，不扫描相邻文件。
-返回：几何、零件尺寸、最小毛坯、H2 原始刀路工时与阶段、推荐/实际路线、三轴装夹次数、DFM、3D 预览；不返回平台价格、交期或内部定价信息。
+返回：几何、零件尺寸、几何最小毛坯、实际加工毛坯及解析方向、H2 原始刀路工时与阶段、推荐/实际路线、三轴装夹次数、DFM、3D 预览；不返回平台价格、交期或内部定价信息。
 分享：公开结果链接及其中的 3D 访问有效 7 天；这不是上传文件或分析结果的数据保留期限。
 
 退出码：
@@ -41,11 +41,13 @@ ${shared}`,
   --process <code>            默认 cnc-machining；cnc 会自动归一化
   --tolerance <code>          默认 ISO2768-m
   --surface-roughness <code>  默认 Ra3.2
+  --stock-box <A> <B> <C>    显式方料名义三边；服务端自动匹配 X/Y/Z
+  --stock-cylinder <D> <L>   显式圆料直径和长度；与 --stock-box 互斥
   --wait                      等待批次进入最终状态
   --json                      stdout 只输出一个稳定 JSON；进度写入 stderr
   --api-base <url>            覆盖分析 API 地址
 
-DFM warning 不阻断工时分析。组件缺失时状态为 completed_with_gaps，并在 geometry/dfm/machining/preview 中单独标明。
+同一命令中的显式毛坯应用于列出的每个文件；已知毛坯时应明确传入。DFM warning 不阻断工时分析。组件缺失时状态为 completed_with_gaps，并在 geometry/dfm/machining/preview 中单独标明。
 
 ${shared}`,
   options: `查询公开材料、工艺、公差、粗糙度、文件限制和制造分析能力。
