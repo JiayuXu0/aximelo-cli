@@ -13,6 +13,10 @@ const MAX_NODE_IDS = 12;
 const MAX_STAGES = 12;
 const MAX_REASON_CODES = 12;
 const MAX_TEXT_CHARS = 180;
+const NON_DFM_SETUP_CODE = "SETUP_COUNT_EXCESSIVE";
+
+export const COMPACT_SECTIONS = ["overview", "geometry", "stock", "machining", "route", "dfm", "preview"] as const;
+export type CompactSection = (typeof COMPACT_SECTIONS)[number];
 
 export function compactAnalysisResult(result: AnalysisBatchResult) {
   return {
@@ -35,6 +39,38 @@ export function compactAnalysisResult(result: AnalysisBatchResult) {
       items: result.items.map((item, index) => compactPart(item, index)),
     },
   };
+}
+
+export function extractCompactAnalysisResult(result: AnalysisBatchResult, section: CompactSection) {
+  const compact = compactAnalysisResult(result);
+  return {
+    ok: compact.ok,
+    format: "agent-extract-v1",
+    limited: true,
+    limits: compact.limits,
+    batch: {
+      batch_id: compact.batch.batch_id,
+      status: compact.batch.status,
+      result_url: compact.batch.result_url,
+      expires_at: compact.batch.expires_at,
+      item_count: compact.batch.item_count,
+      extract: section,
+      items: compact.batch.items.map((item) => ({
+        index: item.index,
+        analysis_id: item.analysis_id,
+        file_name: item.file_name,
+        status: item.status,
+        material: item.material,
+        process: item.process,
+        components: item.components,
+        content: selectContent(item, section),
+      })),
+    },
+  };
+}
+
+export function isCompactSection(value: string): value is CompactSection {
+  return (COMPACT_SECTIONS as readonly string[]).includes(value);
 }
 
 function compactPart(item: AnalysisResult, index: number) {
@@ -98,6 +134,21 @@ function compactPart(item: AnalysisResult, index: number) {
   };
 }
 
+function selectContent(item: ReturnType<typeof compactPart>, section: CompactSection): unknown {
+  if (section === "overview") return { tolerance: item.tolerance, surface_roughness: item.surface_roughness };
+  if (section === "geometry") return item.geometry ?? null;
+  if (section === "stock") {
+    return {
+      minimum_stock: item.geometry?.minimum_stock ?? null,
+      machining_stock: item.machining?.stock ?? null,
+    };
+  }
+  if (section === "machining") return item.machining ?? null;
+  if (section === "route") return item.machining?.route ?? null;
+  if (section === "dfm") return item.dfm ?? null;
+  return item.preview ?? null;
+}
+
 function compactComponent(component: AnalysisComponent) {
   return {
     status: component.status,
@@ -123,11 +174,11 @@ function compactRoute(route: AutoCamRoute | undefined) {
 
 function compactDfm(item: AnalysisResult) {
   if (!item.dfm) return undefined;
-  const findings = item.dfm.findings ?? [];
-  const warnings = item.dfm.warnings ?? [];
-  const suggestions = item.dfm.suggestions ?? [];
+  const findings = (item.dfm.findings ?? []).filter((finding) => !isSetupCountFinding(finding));
+  const warnings = (item.dfm.warnings ?? []).filter((warning) => !isSetupCountText(warning));
+  const suggestions = (item.dfm.suggestions ?? []).filter((suggestion) => !isSetupCountText(suggestion));
   return {
-    risk_level: item.dfm.risk_level,
+    risk_level: findings.length > 0 || warnings.length > 0 ? item.dfm.risk_level : "none",
     finding_count: findings.length,
     findings: findings.slice(0, MAX_FINDINGS).map(compactFinding),
     findings_omitted: Math.max(0, findings.length - MAX_FINDINGS),
@@ -138,6 +189,15 @@ function compactDfm(item: AnalysisResult) {
     suggestions: limitedStrings(suggestions, MAX_SUGGESTIONS),
     suggestions_omitted: Math.max(0, suggestions.length - MAX_SUGGESTIONS),
   };
+}
+
+function isSetupCountFinding(finding: DfmFinding): boolean {
+  return finding.code.trim().toUpperCase() === NON_DFM_SETUP_CODE;
+}
+
+function isSetupCountText(value: string): boolean {
+  const normalized = value.trim();
+  return normalized.toUpperCase().includes(NON_DFM_SETUP_CODE) || normalized.includes("装夹次数偏多");
 }
 
 function compactFinding(finding: DfmFinding) {

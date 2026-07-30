@@ -56,9 +56,20 @@ yoxiang analyze "/exact/path/b.step" --stock-cylinder 60 25 --wait --compact-jso
 
 Always use `--compact-json` for normal analysis and status polling. It returns `agent-summary-v1`, keeps every batch item in input order, and limits only verbose DFM text, node IDs, and excess stage entries. Check every `*_omitted` field and state the omitted count when it is non-zero. Never use raw analysis `--json` by default: it can exhaust the Agent tool-output budget before later files appear. Use raw `--json` only when the user explicitly requests the complete machine payload for debugging; redirect it to a file instead of printing it into the conversation. Do not rerun an analysis merely to recover omitted detail; use the public result page.
 
+When the user asks for one category from an existing batch, query the batch without uploading again:
+
+```bash
+yoxiang analyze status <batch-id> --extract dfm
+yoxiang analyze status <batch-id> --extract route
+```
+
+`--extract` is an independent bounded JSON output mode; never combine it with `--compact-json` or `--json`. It accepts only `overview`, `geometry`, `stock`, `machining`, `route`, `dfm`, or `preview` and returns that category for every part in input order. Do not use extraction for a requested local cost estimate because the calculation requires geometry/stock and machining/route together.
+
 Add `--material`, `--process`, `--tolerance`, or `--surface-roughness` only when the user explicitly overrides a default. Do not run `doctor` or `analyze options` first. Use `doctor` only after installation or connection failure; use `analyze options` only when an explicit non-default value cannot be mapped.
 
 DFM warnings do not block machining-time analysis or a local cost estimate. Mark the risk prominently. Preserve `geometry`, `dfm`, `machining`, and `preview` component statuses independently when the batch is `completed_with_gaps`.
+
+Treat setup count only as a machining-route fact. `SETUP_COUNT_EXCESSIVE` is not a DFM risk; never report it under DFM if it appears in a legacy raw payload.
 
 Keep the stock meanings separate:
 

@@ -8,6 +8,7 @@ yoxiang install --agent codex
 yoxiang analyze ./a.step ./b.step --wait --compact-json
 yoxiang analyze ./plate.step --stock-box 20 868 175 --wait --compact-json
 yoxiang analyze ./round.step --stock-cylinder 60 25 --wait --compact-json
+yoxiang analyze status <batch-id> --extract route
 yoxiang cost-profile show --json
 ```
 

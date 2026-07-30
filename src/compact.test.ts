@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compactAnalysisResult } from "./compact.js";
+import { compactAnalysisResult, extractCompactAnalysisResult } from "./compact.js";
 import type { AnalysisBatchResult, AnalysisResult } from "./types.js";
 
 describe("compact agent analysis output", () => {
@@ -32,12 +32,12 @@ describe("compact agent analysis output", () => {
     ]);
     expect(compact.batch.items[2]).toMatchObject({ index: 3, file_name: "part-3.step" });
     expect(compact.batch.items[0]?.dfm).toMatchObject({
-      finding_count: 20,
-      findings_omitted: 14,
-      warning_count: 10,
-      warnings_omitted: 7,
-      suggestion_count: 10,
-      suggestions_omitted: 7,
+      finding_count: 19,
+      findings_omitted: 13,
+      warning_count: 9,
+      warnings_omitted: 6,
+      suggestion_count: 9,
+      suggestions_omitted: 6,
     });
     expect(compact.batch.items[0]?.dfm?.findings[0]).toMatchObject({
       viewer_node_ids_omitted: 18,
@@ -45,7 +45,76 @@ describe("compact agent analysis output", () => {
     expect(compact.batch.items[0]?.machining).toMatchObject({ stages_omitted: 8 });
     expect(serialized).not.toContain("signed-preview-url");
     expect(serialized).not.toContain("signed-thumbnail-url");
+    expect(serialized).not.toContain("SETUP_COUNT_EXCESSIVE");
+    expect(serialized).not.toContain("装夹次数偏多");
     expect(serialized.length).toBeLessThan(30_000);
+  });
+
+  it("keeps setup count in machining but removes it from DFM", () => {
+    const onlySetupRisk = part(1);
+    onlySetupRisk.dfm = {
+      risk_level: "medium",
+      findings: [setupCountFinding()],
+      warnings: ["装夹次数偏多"],
+      suggestions: ["SETUP_COUNT_EXCESSIVE"],
+    };
+    const compact = compactAnalysisResult({
+      batch_id: "batch-setup",
+      status: "completed",
+      result_path: "/tools/part-analysis/results/batch-setup",
+      items: [onlySetupRisk],
+      requested_at: "2026-07-30T00:00:00Z",
+      expires_at: "2026-08-06T00:00:00Z",
+    });
+
+    expect(compact.batch.items[0]?.machining?.route?.setup_count).toBe(2);
+    expect(compact.batch.items[0]?.dfm).toMatchObject({
+      risk_level: "none",
+      finding_count: 0,
+      findings_omitted: 0,
+      warning_count: 0,
+      warnings_omitted: 0,
+      suggestion_count: 0,
+      suggestions_omitted: 0,
+    });
+  });
+
+  it("extracts one bounded category for every part", () => {
+    const result: AnalysisBatchResult = {
+      batch_id: "batch-extract",
+      status: "completed_with_gaps",
+      result_path: "/tools/part-analysis/results/batch-extract",
+      items: Array.from({ length: 5 }, (_, index) => part(index + 1)),
+      requested_at: "2026-07-30T00:00:00Z",
+      expires_at: "2026-08-06T00:00:00Z",
+    };
+
+    const extracted = extractCompactAnalysisResult(result, "route");
+
+    expect(extracted).toMatchObject({
+      ok: true,
+      format: "agent-extract-v1",
+      batch: { item_count: 5, extract: "route" },
+    });
+    expect(extracted.batch.items.map((item) => item.file_name)).toEqual([
+      "part-1.step",
+      "part-2.step",
+      "part-3.step",
+      "part-4.step",
+      "part-5.step",
+    ]);
+    expect(extracted.batch.items[2]).toMatchObject({
+      index: 3,
+      file_name: "part-3.step",
+      content: {
+        machining_class: "mill_3axis",
+        setup_count: 2,
+        selected_route: { route_class: "mill_3axis" },
+      },
+    });
+    expect(extracted.batch.items[0]?.content).not.toHaveProperty("geometry");
+    expect(extracted.batch.items[0]?.content).not.toHaveProperty("dfm");
+    expect(JSON.stringify(extracted).length).toBeLessThan(10_000);
   });
 });
 
@@ -97,17 +166,20 @@ function part(index: number): AnalysisResult {
     },
     dfm: {
       risk_level: "medium",
-      findings: Array.from({ length: 20 }, (_, finding) => ({
-        code: `RISK_${finding}`,
-        level: "warning",
-        status: "active",
-        message_cn: longText,
-        message_en: "",
-        blocking: false,
-        viewer_node_ids: Array.from({ length: 30 }, (_, node) => node + 1),
-      })),
-      warnings: Array.from({ length: 10 }, () => longText),
-      suggestions: Array.from({ length: 10 }, () => longText),
+      findings: [
+        setupCountFinding(),
+        ...Array.from({ length: 19 }, (_, finding) => ({
+          code: `RISK_${finding}`,
+          level: "warning",
+          status: "active",
+          message_cn: longText,
+          message_en: "",
+          blocking: false,
+          viewer_node_ids: Array.from({ length: 30 }, (_, node) => node + 1),
+        })),
+      ],
+      warnings: ["装夹次数偏多", ...Array.from({ length: 9 }, () => longText)],
+      suggestions: ["SETUP_COUNT_EXCESSIVE", ...Array.from({ length: 9 }, () => longText)],
     },
     preview: {
       status: "succeeded",
@@ -118,6 +190,18 @@ function part(index: number): AnalysisResult {
     requested_at: "2026-07-30T00:00:00Z",
     completed_at: "2026-07-30T00:01:00Z",
     expires_at: "2026-08-06T00:00:00Z",
+  };
+}
+
+function setupCountFinding() {
+  return {
+    code: "SETUP_COUNT_EXCESSIVE",
+    level: "warning",
+    status: "active",
+    message_cn: "装夹次数偏多",
+    message_en: "Too many setups",
+    blocking: false,
+    viewer_node_ids: [10, 12, 13],
   };
 }
 

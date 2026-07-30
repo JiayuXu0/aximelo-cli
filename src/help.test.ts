@@ -17,5 +17,7 @@ describe("hierarchical help", () => {
     expect(HELP.costProfile).toContain("0600");
     expect(HELP.analyze).toContain("--compact-json");
     expect(HELP.analyze).toContain("保留全部零件");
+    expect(HELP.analyze).toContain("--extract <section>");
+    expect(HELP.analyze).not.toContain("--item");
   });
 });

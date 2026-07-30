@@ -16,8 +16,8 @@ export const HELP = {
   root: `YoxiangAI 零件分析 CLI ${CLI_VERSION}
 
 用法：
-  yoxiang analyze <file.step> [more.stp ...] [--wait] [--compact-json|--json]
-  yoxiang analyze status <batch-id> [--wait] [--compact-json|--json]
+  yoxiang analyze <file.step> [more.stp ...] [--wait] [--compact-json|--json|--extract section]
+  yoxiang analyze status <batch-id> [--wait] [--compact-json|--json|--extract section]
   yoxiang analyze options [--json]
   yoxiang cost-profile configure
   yoxiang cost-profile show [--json]
@@ -45,6 +45,7 @@ ${shared}`,
   --stock-cylinder <D> <L>   显式圆料直径和长度；与 --stock-box 互斥
   --wait                      等待批次进入最终状态
   --compact-json              面向 Agent 的有界摘要；保留全部零件并标明省略的 DFM 明细
+  --extract <section>         独立提取 overview、geometry、stock、machining、route、dfm 或 preview
   --json                      stdout 只输出一个稳定 JSON；进度写入 stderr
   --api-base <url>            覆盖分析 API 地址
 
@@ -58,7 +59,7 @@ ${shared}`,
   status: `查询分析批次状态；--wait 会持续轮询到 completed、completed_with_gaps、failed 或 expired。
 
 用法：
-  yoxiang analyze status <batch-id> [--wait] [--compact-json|--json] [--api-base <url>]`,
+  yoxiang analyze status <batch-id> [--wait] [--compact-json|--json|--extract section] [--api-base <url>]`,
   costProfile: `管理仅保存在本机的成本参数。POSIX 路径为 \${XDG_CONFIG_HOME:-~/.config}/yoxiang/cost-profile.json，Windows 路径为 %APPDATA%\\yoxiang\\cost-profile.json。
 
 用法：

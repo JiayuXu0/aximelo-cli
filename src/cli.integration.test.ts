@@ -38,6 +38,27 @@ describe("CLI integration", () => {
     expect(result.stderr).toBe("");
   });
 
+  it.each([
+    ["--json", "--extract", "route"],
+    ["--compact-json", "--extract", "route"],
+  ])("rejects mutually exclusive extraction output before network access", (...outputArgs) => {
+    const result = spawnSync(process.execPath, ["dist/cli.js", "analyze", "missing.step", ...outputArgs], {
+      cwd: process.cwd(), encoding: "utf8", env: { ...process.env, YOXIANG_API_BASE_URL: "http://127.0.0.1:1" },
+    });
+    expect(result.status).toBe(4);
+    expect(JSON.parse(result.stdout)).toMatchObject({ ok: false, error: { message: expect.stringContaining("互斥") } });
+    expect(result.stderr).toBe("");
+  });
+
+  it("rejects an unknown extraction category before file or network access", () => {
+    const result = spawnSync(process.execPath, ["dist/cli.js", "analyze", "missing.step", "--extract", "unknown"], {
+      cwd: process.cwd(), encoding: "utf8", env: { ...process.env, YOXIANG_API_BASE_URL: "http://127.0.0.1:1" },
+    });
+    expect(result.status).toBe(4);
+    expect(JSON.parse(result.stdout)).toMatchObject({ ok: false, error: { message: expect.stringContaining("overview") } });
+    expect(result.stderr).toBe("");
+  });
+
   it("rejects mutually exclusive stock flags before file or network access", () => {
     const result = spawnSync(process.execPath, ["dist/cli.js", "analyze", "missing.step", "--stock-box", "20", "30", "40", "--stock-cylinder", "60", "25"], {
       cwd: process.cwd(), encoding: "utf8", env: { ...process.env, YOXIANG_API_BASE_URL: "http://127.0.0.1:1" },
