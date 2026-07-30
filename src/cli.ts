@@ -21,6 +21,7 @@ import {
   type ConfigureCostProfileInput,
   type CostProfile,
 } from "./cost-profile.js";
+import { compactAnalysisResult } from "./compact.js";
 import { CLI_VERSION, HELP, resolveHelp } from "./help.js";
 import type { AnalysisBatchResult, AnalysisOptions, AnalysisResult, StockInput } from "./types.js";
 import { checkForUpdate, installGlobalUpdate, type UpdateChannel } from "./update.js";
@@ -38,8 +39,15 @@ if (helpTopic) {
 async function run(inputArgs: string[]): Promise<void> {
   const args = [...inputArgs];
   const json = takeFlag(args, "--json");
+  const compactJson = takeFlag(args, "--compact-json");
+  const structuredOutput = json || compactJson;
   try {
+    if (json && compactJson) throw new CliError("--json 与 --compact-json 互斥，只能选择一种输出格式。", 4);
     const command = args.shift();
+
+    if (compactJson && command !== "analyze") {
+      throw new CliError("--compact-json 仅支持 analyze 和 analyze status。", 4);
+    }
 
     // The retired command deliberately exits before constructing a client or issuing a request.
     if (command === "quote") {
@@ -113,6 +121,7 @@ async function run(inputArgs: string[]): Promise<void> {
     if (command !== "analyze") throw new CliError(`未知命令：${command ?? ""}。请运行 yoxiang --help。`, 4);
     const first = args[0];
     if (first === "options") {
+      if (compactJson) throw new CliError("analyze options 不需要紧凑输出；请使用 --json。", 4);
       args.shift();
       assertNoExtraArgs(args, "yoxiang analyze options --help");
       const options = await client.options();
@@ -128,10 +137,10 @@ async function run(inputArgs: string[]): Promise<void> {
       let result = await client.batchStatus(id);
       if (wait && !isBatchTerminal(result.status)) {
         result = await client.waitBatch(id, 10 * 60_000, (current) => {
-          if (!json) process.stderr.write(`当前状态：${current.status}\n`);
+          if (!structuredOutput) process.stderr.write(`当前状态：${current.status}\n`);
         });
       }
-      emitAnalysisResult(json, result);
+      emitAnalysisResult(json, compactJson, result);
       return;
     }
 
@@ -155,22 +164,22 @@ async function run(inputArgs: string[]): Promise<void> {
     }
     if (args.length === 0) throw new CliError("analyze 需要至少一个明确的 STEP/STP 文件路径。请运行 yoxiang analyze --help。", 4);
 
-    process.stderr.write(`正在校验并提交 ${args.length} 个零件进行制造分析…\n`);
+    if (!compactJson) process.stderr.write(`正在校验并提交 ${args.length} 个零件进行制造分析…\n`);
     let result = await client.submitBatch({ filePaths: args, material, process: processName, tolerance, surfaceRoughness, stock });
     if (wait && !isBatchTerminal(result.status)) {
-      process.stderr.write(`批次 ${result.batch_id} 已提交，YoxiangAI 正在分析几何、DFM、加工工时和预览…\n`);
+      if (!compactJson) process.stderr.write(`批次 ${result.batch_id} 已提交，YoxiangAI 正在分析几何、DFM、加工工时和预览…\n`);
       let previous = "";
       result = await client.waitBatch(result.batch_id, 10 * 60_000, (current) => {
-        if (current.status !== previous) {
+        if (!compactJson && current.status !== previous) {
           process.stderr.write(`当前状态：${current.status}\n`);
           previous = current.status;
         }
       });
     }
-    emitAnalysisResult(json, result);
+    emitAnalysisResult(json, compactJson, result);
   } catch (error: unknown) {
     const cliError = error instanceof CliError ? error : new CliError("命令执行失败。", 5, error);
-    if (json) process.stdout.write(`${JSON.stringify({ ok: false, error: { message: cliError.message, details: cliError.details } })}\n`);
+    if (structuredOutput) process.stdout.write(`${JSON.stringify({ ok: false, error: { message: cliError.message, details: cliError.details } })}\n`);
     else process.stderr.write(`错误：${cliError.message}\n`);
     process.exitCode = cliError.exitCode;
   }
@@ -265,8 +274,9 @@ async function promptNumber(rl: ReturnType<typeof createInterface>, prompt: stri
   return value;
 }
 
-function emitAnalysisResult(json: boolean, result: AnalysisBatchResult): void {
-  emit(json, { ok: result.status === "completed" || result.status === "completed_with_gaps", batch: result }, formatAnalysisResult(result));
+function emitAnalysisResult(json: boolean, compactJson: boolean, result: AnalysisBatchResult): void {
+  if (compactJson) process.stdout.write(`${JSON.stringify(compactAnalysisResult(result))}\n`);
+  else emit(json, { ok: result.status === "completed" || result.status === "completed_with_gaps", batch: result }, formatAnalysisResult(result));
   if (result.status === "failed" || result.status === "expired") process.exitCode = 5;
   else if (!isBatchTerminal(result.status)) process.exitCode = 3;
 }

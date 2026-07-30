@@ -5,9 +5,9 @@ YoxiangAI 公开零件制造分析 CLI 与 Agent Skill。服务端返回几何�
 ```bash
 npm install -g @yoxiang/cli@latest
 yoxiang install --agent codex
-yoxiang analyze ./a.step ./b.step --wait --json
-yoxiang analyze ./plate.step --stock-box 20 868 175 --wait --json
-yoxiang analyze ./round.step --stock-cylinder 60 25 --wait --json
+yoxiang analyze ./a.step ./b.step --wait --compact-json
+yoxiang analyze ./plate.step --stock-box 20 868 175 --wait --compact-json
+yoxiang analyze ./round.step --stock-cylinder 60 25 --wait --compact-json
 yoxiang cost-profile show --json
 ```
 

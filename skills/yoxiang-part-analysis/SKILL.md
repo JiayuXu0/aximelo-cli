@@ -37,22 +37,24 @@ Use the YoxiangAI public service for manufacturing analysis only. It never retur
 For up to five exact paths, run the analysis exactly once:
 
 ```bash
-yoxiang analyze "/exact/path/a.step" "/exact/path/b.stp" --wait --json
+yoxiang analyze "/exact/path/a.step" "/exact/path/b.stp" --wait --compact-json
 ```
 
 For known block dimensions, their order is nominal and does not assert X/Y/Z. AutoCam resolves the enclosing axis permutation:
 
 ```bash
-yoxiang analyze "/exact/path/a.step" --stock-box 20 868 175 --wait --json
+yoxiang analyze "/exact/path/a.step" --stock-box 20 868 175 --wait --compact-json
 ```
 
 For known cylindrical stock:
 
 ```bash
-yoxiang analyze "/exact/path/b.step" --stock-cylinder 60 25 --wait --json
+yoxiang analyze "/exact/path/b.step" --stock-cylinder 60 25 --wait --compact-json
 ```
 
 `--stock-box` and `--stock-cylinder` are mutually exclusive. One stock flag applies to every explicitly listed file in that CLI invocation, so split the batch when files have different blanks. If the explicit blank does not contain the part, report `AUTOCAM_INVALID_STOCK`; do not retry without the blank.
+
+Always use `--compact-json` for normal analysis and status polling. It returns `agent-summary-v1`, keeps every batch item in input order, and limits only verbose DFM text, node IDs, and excess stage entries. Check every `*_omitted` field and state the omitted count when it is non-zero. Never use raw analysis `--json` by default: it can exhaust the Agent tool-output budget before later files appear. Use raw `--json` only when the user explicitly requests the complete machine payload for debugging; redirect it to a file instead of printing it into the conversation. Do not rerun an analysis merely to recover omitted detail; use the public result page.
 
 Add `--material`, `--process`, `--tolerance`, or `--surface-roughness` only when the user explicitly overrides a default. Do not run `doctor` or `analyze options` first. Use `doctor` only after installation or connection failure; use `analyze options` only when an explicit non-default value cannot be mapped.
 
