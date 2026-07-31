@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compactAnalysisResult, extractCompactAnalysisResult } from "./compact.js";
+import { analysisResultInMinutes, compactAnalysisResult, extractCompactAnalysisResult, isSetupCountDfmText } from "./compact.js";
 import type { AnalysisBatchResult, AnalysisResult } from "./types.js";
 
 describe("compact agent analysis output", () => {
@@ -20,7 +20,7 @@ describe("compact agent analysis output", () => {
 
     expect(compact).toMatchObject({
       ok: true,
-      format: "agent-summary-v1",
+      format: "agent-summary-v2",
       batch: { item_count: 5 },
     });
     expect(compact.batch.items.map((item) => item.file_name)).toEqual([
@@ -42,7 +42,11 @@ describe("compact agent analysis output", () => {
     expect(compact.batch.items[0]?.dfm?.findings[0]).toMatchObject({
       viewer_node_ids_omitted: 18,
     });
-    expect(compact.batch.items[0]?.machining).toMatchObject({ stages_omitted: 8 });
+    expect(compact.batch.items[0]?.machining).toMatchObject({
+      stages_omitted: 8,
+      total_processing_minutes: 90,
+      cnc_breakdown_minutes: { holemaking: 15, roughing: 45, finishing: 24, deburring: 6 },
+    });
     expect(serialized).not.toContain("signed-preview-url");
     expect(serialized).not.toContain("signed-thumbnail-url");
     expect(serialized).not.toContain("SETUP_COUNT_EXCESSIVE");
@@ -93,7 +97,7 @@ describe("compact agent analysis output", () => {
 
     expect(extracted).toMatchObject({
       ok: true,
-      format: "agent-extract-v1",
+      format: "agent-extract-v2",
       batch: { item_count: 5, extract: "route" },
     });
     expect(extracted.batch.items.map((item) => item.file_name)).toEqual([
@@ -115,6 +119,42 @@ describe("compact agent analysis output", () => {
     expect(extracted.batch.items[0]?.content).not.toHaveProperty("geometry");
     expect(extracted.batch.items[0]?.content).not.toHaveProperty("dfm");
     expect(JSON.stringify(extracted).length).toBeLessThan(10_000);
+
+    const machining = extractCompactAnalysisResult(result, "machining");
+    expect(machining.batch.items[0]?.content).toMatchObject({
+      total_processing_minutes: 90,
+      cnc_breakdown_minutes: { deburring: 6 },
+    });
+    const machiningContent = machining.batch.items[0]?.content as { stages: Array<{ code: string; minutes: number }> };
+    expect(machiningContent.stages[0]).toEqual({ code: "stage-0", minutes: 6 });
+    expect(machining.batch.items[0]?.content).not.toHaveProperty("total_processing");
+  });
+
+  it("filters route/setup wording without hiding real fixture deformation risks", () => {
+    expect(isSetupCountDfmText("需多次装夹转换（多工位）。特征散落在多个侧向几何面方向上，机床必须停机重新装夹。"))
+      .toBe(true);
+    expect(isSetupCountDfmText("薄壁件装夹变形风险较高，应增加支撑。"))
+      .toBe(false);
+  });
+
+  it("converts full CLI JSON machining fields to minutes without retaining hour fields", () => {
+    const converted = analysisResultInMinutes({
+      batch_id: "batch-json",
+      status: "completed",
+      result_path: "/tools/part-analysis/results/batch-json",
+      items: [part(1)],
+      requested_at: "2026-07-30T00:00:00Z",
+      expires_at: "2026-08-06T00:00:00Z",
+    });
+
+    expect(converted.items[0]?.machining).toMatchObject({
+      total_processing_minutes: 90,
+      cnc_breakdown_minutes: { deburring: 6 },
+    });
+    expect(converted.items[0]?.machining?.stages[0]).toEqual({ code: "stage-0", minutes: 6 });
+    const serialized = JSON.stringify(converted.items[0]?.machining);
+    expect(serialized).not.toContain("total_processing\"");
+    expect(serialized).not.toContain("hours");
   });
 });
 
@@ -153,6 +193,7 @@ function part(index: number): AnalysisResult {
     machining: {
       total_processing: 1.5,
       estimate_grade: "trusted",
+      cnc_breakdown_minutes: { holemaking: 15, roughing: 45, finishing: 24, deburring: 6 },
       stages: Array.from({ length: 20 }, (_, stage) => ({ code: `stage-${stage}`, hours: 0.1 })),
       route: {
         machining_class: "mill_3axis",

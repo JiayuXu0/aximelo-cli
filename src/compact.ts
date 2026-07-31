@@ -18,10 +18,31 @@ const NON_DFM_SETUP_CODE = "SETUP_COUNT_EXCESSIVE";
 export const COMPACT_SECTIONS = ["overview", "geometry", "stock", "machining", "route", "dfm", "preview"] as const;
 export type CompactSection = (typeof COMPACT_SECTIONS)[number];
 
+export function analysisResultInMinutes(result: AnalysisBatchResult) {
+  return {
+    ...result,
+    items: result.items.map((item) => {
+      if (!item.machining) return item;
+      const { total_processing, stages, ...machining } = item.machining;
+      return {
+        ...item,
+        machining: {
+          ...machining,
+          total_processing_minutes: hoursToMinutes(total_processing),
+          stages: (stages ?? []).map((stage) => ({
+            code: stage.code,
+            minutes: hoursToMinutes(stage.hours),
+          })),
+        },
+      };
+    }),
+  };
+}
+
 export function compactAnalysisResult(result: AnalysisBatchResult) {
   return {
     ok: result.status === "completed" || result.status === "completed_with_gaps",
-    format: "agent-summary-v1",
+    format: "agent-summary-v2",
     limited: true,
     limits: {
       findings_per_item: MAX_FINDINGS,
@@ -45,7 +66,7 @@ export function extractCompactAnalysisResult(result: AnalysisBatchResult, sectio
   const compact = compactAnalysisResult(result);
   return {
     ok: compact.ok,
-    format: "agent-extract-v1",
+    format: "agent-extract-v2",
     limited: true,
     limits: compact.limits,
     batch: {
@@ -74,7 +95,10 @@ export function isCompactSection(value: string): value is CompactSection {
 }
 
 function compactPart(item: AnalysisResult, index: number) {
-  const stages = item.machining?.stages ?? [];
+  const stages = (item.machining?.stages ?? []).map((stage) => ({
+    code: stage.code,
+    minutes: hoursToMinutes(stage.hours),
+  }));
   return {
     index: index + 1,
     analysis_id: item.analysis_id,
@@ -101,12 +125,20 @@ function compactPart(item: AnalysisResult, index: number) {
       : undefined,
     machining: item.machining
       ? {
-          total_processing: item.machining.total_processing,
+          total_processing_minutes: hoursToMinutes(item.machining.total_processing),
           estimate_grade: item.machining.estimate_grade,
           setup_count: item.machining.setup_count,
           stock: item.machining.stock,
           stages: stages.slice(0, MAX_STAGES),
           stages_omitted: Math.max(0, stages.length - MAX_STAGES),
+          cnc_breakdown_minutes: item.machining.cnc_breakdown_minutes
+            ? {
+                holemaking: item.machining.cnc_breakdown_minutes.holemaking,
+                roughing: item.machining.cnc_breakdown_minutes.roughing,
+                finishing: item.machining.cnc_breakdown_minutes.finishing,
+                deburring: item.machining.cnc_breakdown_minutes.deburring,
+              }
+            : undefined,
           route: item.machining.route
             ? {
                 machining_class: item.machining.route.machining_class,
@@ -174,9 +206,9 @@ function compactRoute(route: AutoCamRoute | undefined) {
 
 function compactDfm(item: AnalysisResult) {
   if (!item.dfm) return undefined;
-  const findings = (item.dfm.findings ?? []).filter((finding) => !isSetupCountFinding(finding));
-  const warnings = (item.dfm.warnings ?? []).filter((warning) => !isSetupCountText(warning));
-  const suggestions = (item.dfm.suggestions ?? []).filter((suggestion) => !isSetupCountText(suggestion));
+  const findings = (item.dfm.findings ?? []).filter((finding) => !isSetupCountDfmCode(finding.code));
+  const warnings = (item.dfm.warnings ?? []).filter((warning) => !isSetupCountDfmText(warning));
+  const suggestions = (item.dfm.suggestions ?? []).filter((suggestion) => !isSetupCountDfmText(suggestion));
   return {
     risk_level: findings.length > 0 || warnings.length > 0 ? item.dfm.risk_level : "none",
     finding_count: findings.length,
@@ -191,13 +223,14 @@ function compactDfm(item: AnalysisResult) {
   };
 }
 
-function isSetupCountFinding(finding: DfmFinding): boolean {
-  return finding.code.trim().toUpperCase() === NON_DFM_SETUP_CODE;
+export function isSetupCountDfmCode(value: string): boolean {
+  return value.trim().toUpperCase() === NON_DFM_SETUP_CODE;
 }
 
-function isSetupCountText(value: string): boolean {
+export function isSetupCountDfmText(value: string): boolean {
   const normalized = value.trim();
-  return normalized.toUpperCase().includes(NON_DFM_SETUP_CODE) || normalized.includes("装夹次数偏多");
+  return normalized.toUpperCase().includes(NON_DFM_SETUP_CODE)
+    || ["装夹次数", "多次装夹", "重新装夹", "多工位"].some((phrase) => normalized.includes(phrase));
 }
 
 function compactFinding(finding: DfmFinding) {
@@ -221,4 +254,8 @@ function compactText(value: string | undefined): string | undefined {
   if (value === undefined) return undefined;
   const normalized = value.replace(/\s+/g, " ").trim();
   return Array.from(normalized).slice(0, MAX_TEXT_CHARS).join("");
+}
+
+function hoursToMinutes(value: number): number {
+  return Number((value * 60).toFixed(6));
 }

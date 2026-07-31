@@ -18,6 +18,11 @@ describe("hierarchical help", () => {
     expect(HELP.analyze).toContain("--compact-json");
     expect(HELP.analyze).toContain("保留全部零件");
     expect(HELP.analyze).toContain("--extract <section>");
+    expect(HELP.analyze).toContain("工时统一为分钟");
+    expect(HELP.analyze).not.toContain("兼容字段仍为小时");
     expect(HELP.analyze).not.toContain("--item");
+    expect(HELP.root).toContain("最多每 24 小时检查一次 npm");
+    expect(HELP.root).toContain("只提示，不自动安装");
+    expect(HELP.root).toContain("倒角去毛刺四类 CNC 工时");
   });
 });

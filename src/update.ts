@@ -1,5 +1,7 @@
 import { execFile } from "node:child_process";
-import { join } from "node:path";
+import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -18,13 +20,43 @@ export type UpdateCheck = {
   update_available: boolean;
 };
 
+export type UpdateNotice = {
+  update_available: true;
+  current_version: string;
+  latest_version: string;
+  command: "yoxiang update --agent codex";
+};
+
+type UpdateNoticeState = {
+  checked_at_ms: number;
+  current_version: string;
+  latest_version?: string;
+  update_available?: boolean;
+  check_failed?: boolean;
+};
+
+export type UpdateNoticeOptions = {
+  cachePath?: string;
+  intervalMs?: number;
+  failureIntervalMs?: number;
+  nowMs?: number;
+  registry?: string;
+  timeoutMs?: number;
+};
+
+export const UPDATE_NOTICE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+export const UPDATE_NOTICE_FAILURE_INTERVAL_MS = 60 * 60 * 1000;
+export const UPDATE_NOTICE_TIMEOUT_MS = 1500;
+
 export async function checkForUpdate(
   currentVersion: string,
   channel: UpdateChannel,
   registry = NPM_REGISTRY,
+  signal?: AbortSignal,
 ): Promise<UpdateCheck> {
   const response = await fetch(`${registry.replace(/\/$/, "")}/@yoxiang%2Fcli`, {
     headers: { accept: "application/vnd.npm.install-v1+json" },
+    signal,
   });
   if (!response.ok) throw new Error(`npm registry returned HTTP ${response.status}`);
   const metadata = (await response.json()) as { "dist-tags"?: Record<string, string> };
@@ -38,6 +70,50 @@ export async function checkForUpdate(
     target_version: targetVersion,
     update_available: comparison > 0,
   };
+}
+
+export function updateNoticePath(env: NodeJS.ProcessEnv = process.env): string {
+  return join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "yoxiang", "update-check.json");
+}
+
+export async function checkForUpdateNotice(
+  currentVersion: string,
+  options: UpdateNoticeOptions = {},
+): Promise<UpdateNotice | undefined> {
+  const cachePath = options.cachePath ?? updateNoticePath();
+  const nowMs = options.nowMs ?? Date.now();
+  const intervalMs = options.intervalMs ?? UPDATE_NOTICE_INTERVAL_MS;
+  const failureIntervalMs = options.failureIntervalMs ?? UPDATE_NOTICE_FAILURE_INTERVAL_MS;
+  const cached = await readUpdateNoticeState(cachePath);
+  if (cached?.current_version === currentVersion) {
+    const ageMs = Math.max(0, nowMs - cached.checked_at_ms);
+    const freshnessMs = cached.check_failed ? failureIntervalMs : intervalMs;
+    if (ageMs < freshnessMs) return noticeFromState(cached);
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? UPDATE_NOTICE_TIMEOUT_MS);
+  try {
+    const check = await checkForUpdate(currentVersion, "latest", options.registry ?? NPM_REGISTRY, controller.signal);
+    const state: UpdateNoticeState = {
+      checked_at_ms: nowMs,
+      current_version: currentVersion,
+      latest_version: check.target_version,
+      update_available: check.update_available,
+    };
+    await writeUpdateNoticeState(cachePath, state).catch(() => undefined);
+    return noticeFromState(state);
+  } catch {
+    if (cached?.current_version === currentVersion && cached.update_available) return noticeFromState(cached);
+    await writeUpdateNoticeState(cachePath, {
+      checked_at_ms: nowMs,
+      current_version: currentVersion,
+      check_failed: true,
+    }).catch(() => undefined);
+    return undefined;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function installGlobalUpdate(
@@ -89,6 +165,34 @@ export function compareVersions(left: string, right: string): number {
     return leftPart < rightPart ? -1 : 1;
   }
   return 0;
+}
+
+function noticeFromState(state: UpdateNoticeState): UpdateNotice | undefined {
+  if (!state.update_available || !state.latest_version) return undefined;
+  return {
+    update_available: true,
+    current_version: state.current_version,
+    latest_version: state.latest_version,
+    command: "yoxiang update --agent codex",
+  };
+}
+
+async function readUpdateNoticeState(path: string): Promise<UpdateNoticeState | undefined> {
+  try {
+    const value = JSON.parse(await readFile(path, "utf8")) as Partial<UpdateNoticeState>;
+    if (typeof value.checked_at_ms !== "number" || typeof value.current_version !== "string") return undefined;
+    return value as UpdateNoticeState;
+  } catch {
+    return undefined;
+  }
+}
+
+async function writeUpdateNoticeState(path: string, state: UpdateNoticeState): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  const temporaryPath = `${path}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(temporaryPath, `${JSON.stringify(state)}\n`, { encoding: "utf8", mode: 0o600 });
+  await rename(temporaryPath, path);
+  if (process.platform !== "win32") await chmod(path, 0o600);
 }
 
 function parseVersion(value: string): { core: [number, number, number]; prerelease: string[] } {

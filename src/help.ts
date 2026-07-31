@@ -1,10 +1,11 @@
-export const CLI_VERSION = "0.6.1";
+export const CLI_VERSION = "0.6.2";
 
 const shared = `默认分析参数：6061 铝、CNC、ISO 2768-m、Ra 3.2。
 限制：每个 STEP/STP 文件不超过 10 MiB；每批最多 5 个零件。
 安全：只上传命令中明确列出的文件；不接受目录或 glob，不扫描相邻文件。
-返回：几何、零件尺寸、几何最小毛坯、实际加工毛坯及解析方向、H2 原始刀路工时与阶段、推荐/实际路线、三轴装夹次数、DFM、3D 预览；不返回平台价格、交期或内部定价信息。
+返回：几何、零件尺寸、几何最小毛坯、实际加工毛坯及解析方向、H2 原始刀路总工时、六阶段工时、孔加工/粗加工/精加工/倒角去毛刺四类 CNC 工时、推荐/实际路线、三轴装夹次数、DFM、3D 预览；不返回平台价格、交期或内部定价信息。
 分享：公开结果链接及其中的 3D 访问有效 7 天；这不是上传文件或分析结果的数据保留期限。
+更新：成功访问分析服务后最多每 24 小时检查一次 npm；发现新版本时只提示，不自动安装，检查失败不影响分析。
 
 退出码：
   0  已完成（包括 completed_with_gaps）或显示帮助
@@ -44,9 +45,9 @@ ${shared}`,
   --stock-box <A> <B> <C>    显式方料名义三边；服务端自动匹配 X/Y/Z
   --stock-cylinder <D> <L>   显式圆料直径和长度；与 --stock-box 互斥
   --wait                      等待批次进入最终状态
-  --compact-json              面向 Agent 的有界摘要；保留全部零件并标明省略的 DFM 明细
+  --compact-json              面向 Agent 的有界摘要；工时统一为分钟，保留全部零件并标明省略的 DFM 明细
   --extract <section>         独立提取 overview、geometry、stock、machining、route、dfm 或 preview
-  --json                      stdout 只输出一个稳定 JSON；进度写入 stderr
+  --json                      stdout 输出完整 CLI JSON；工时统一为分钟，进度写入 stderr
   --api-base <url>            覆盖分析 API 地址
 
 同一命令中的显式毛坯应用于列出的每个文件；已知毛坯时应明确传入。DFM warning 不阻断工时分析。组件缺失时状态为 completed_with_gaps，并在 geometry/dfm/machining/preview 中单独标明。

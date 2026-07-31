@@ -23,14 +23,23 @@ import {
 } from "./cost-profile.js";
 import {
   COMPACT_SECTIONS,
+  analysisResultInMinutes,
   compactAnalysisResult,
   extractCompactAnalysisResult,
   isCompactSection,
+  isSetupCountDfmCode,
+  isSetupCountDfmText,
   type CompactSection,
 } from "./compact.js";
 import { CLI_VERSION, HELP, resolveHelp } from "./help.js";
 import type { AnalysisBatchResult, AnalysisOptions, AnalysisResult, StockInput } from "./types.js";
-import { checkForUpdate, installGlobalUpdate, type UpdateChannel } from "./update.js";
+import {
+  checkForUpdate,
+  checkForUpdateNotice,
+  installGlobalUpdate,
+  type UpdateChannel,
+  type UpdateNotice,
+} from "./update.js";
 
 const rawArgs = process.argv.slice(2);
 const helpTopic = resolveHelp(rawArgs);
@@ -123,7 +132,8 @@ async function run(inputArgs: string[]): Promise<void> {
     if (command === "doctor") {
       assertNoExtraArgs(args, "yoxiang doctor --help");
       const options = await client.options();
-      emit(json, { ok: true, api_base_url: apiBase, service: "reachable", options }, formatDoctor(options, apiBase));
+      const updateNotice = await checkForCliUpdateNotice();
+      emit(json, { ok: true, api_base_url: apiBase, service: "reachable", options }, formatDoctor(options, apiBase), updateNotice);
       return;
     }
 
@@ -142,7 +152,8 @@ async function run(inputArgs: string[]): Promise<void> {
       args.shift();
       assertNoExtraArgs(args, "yoxiang analyze options --help");
       const options = await client.options();
-      emit(json, { ok: true, options }, formatOptions(options));
+      const updateNotice = await checkForCliUpdateNotice();
+      emit(json, { ok: true, options }, formatOptions(options), updateNotice);
       return;
     }
     if (first === "status") {
@@ -152,12 +163,13 @@ async function run(inputArgs: string[]): Promise<void> {
       if (!id) throw new CliError("status 需要 batch-id。请运行 yoxiang analyze status --help。", 4);
       assertNoExtraArgs(args, "yoxiang analyze status --help");
       let result = await client.batchStatus(id);
+      const updateNoticePromise = checkForCliUpdateNotice();
       if (wait && !isBatchTerminal(result.status)) {
         result = await client.waitBatch(id, 10 * 60_000, (current) => {
           if (!structuredOutput) process.stderr.write(`当前状态：${current.status}\n`);
         });
       }
-      emitAnalysisResult(json, compactJson, compactSection, result);
+      emitAnalysisResult(json, compactJson, compactSection, result, await updateNoticePromise);
       return;
     }
 
@@ -183,6 +195,7 @@ async function run(inputArgs: string[]): Promise<void> {
 
     if (!structuredOutput) process.stderr.write(`正在校验并提交 ${args.length} 个零件进行制造分析…\n`);
     let result = await client.submitBatch({ filePaths: args, material, process: processName, tolerance, surfaceRoughness, stock });
+    const updateNoticePromise = checkForCliUpdateNotice();
     if (wait && !isBatchTerminal(result.status)) {
       if (!structuredOutput) process.stderr.write(`批次 ${result.batch_id} 已提交，YoxiangAI 正在分析几何、DFM、加工工时和预览…\n`);
       let previous = "";
@@ -193,7 +206,7 @@ async function run(inputArgs: string[]): Promise<void> {
         }
       });
     }
-    emitAnalysisResult(json, compactJson, compactSection, result);
+    emitAnalysisResult(json, compactJson, compactSection, result, await updateNoticePromise);
   } catch (error: unknown) {
     const cliError = error instanceof CliError ? error : new CliError("命令执行失败。", 5, error);
     if (structuredOutput) process.stdout.write(`${JSON.stringify({ ok: false, error: { message: cliError.message, details: cliError.details } })}\n`);
@@ -291,16 +304,36 @@ async function promptNumber(rl: ReturnType<typeof createInterface>, prompt: stri
   return value;
 }
 
-function emitAnalysisResult(json: boolean, compactJson: boolean, section: CompactSection | undefined, result: AnalysisBatchResult): void {
-  if (section) process.stdout.write(`${JSON.stringify(extractCompactAnalysisResult(result, section))}\n`);
-  else if (compactJson) process.stdout.write(`${JSON.stringify(compactAnalysisResult(result))}\n`);
-  else emit(json, { ok: result.status === "completed" || result.status === "completed_with_gaps", batch: result }, formatAnalysisResult(result));
+function emitAnalysisResult(json: boolean, compactJson: boolean, section: CompactSection | undefined, result: AnalysisBatchResult, updateNotice?: UpdateNotice): void {
+  if (section) process.stdout.write(`${JSON.stringify(withUpdateNotice(extractCompactAnalysisResult(result, section), updateNotice))}\n`);
+  else if (compactJson) process.stdout.write(`${JSON.stringify(withUpdateNotice(compactAnalysisResult(result), updateNotice))}\n`);
+  else emit(json, {
+    ok: result.status === "completed" || result.status === "completed_with_gaps",
+    format: "cli-json-v2",
+    batch: analysisResultInMinutes(result),
+  }, formatAnalysisResult(result), updateNotice);
   if (result.status === "failed" || result.status === "expired") process.exitCode = 5;
   else if (!isBatchTerminal(result.status)) process.exitCode = 3;
 }
 
-function emit(json: boolean, payload: unknown, human: string): void {
-  process.stdout.write(json ? `${JSON.stringify(payload)}\n` : `${human}\n`);
+function emit(json: boolean, payload: unknown, human: string, updateNotice?: UpdateNotice): void {
+  process.stdout.write(json
+    ? `${JSON.stringify(withUpdateNotice(payload, updateNotice))}\n`
+    : `${human}${updateNotice ? `\n${formatUpdateNotice(updateNotice)}` : ""}\n`);
+}
+
+function withUpdateNotice(payload: unknown, updateNotice?: UpdateNotice): unknown {
+  if (!updateNotice || typeof payload !== "object" || payload === null || Array.isArray(payload)) return payload;
+  return { ...(payload as Record<string, unknown>), update_notice: updateNotice };
+}
+
+function formatUpdateNotice(notice: UpdateNotice): string {
+  return `更新提示：发现 Yoxiang CLI ${notice.latest_version}，当前为 ${notice.current_version}。运行：${notice.command}`;
+}
+
+function checkForCliUpdateNotice(): Promise<UpdateNotice | undefined> {
+  const registry = process.env.YOXIANG_NPM_REGISTRY;
+  return checkForUpdateNotice(CLI_VERSION, registry ? { registry } : {});
 }
 
 function takeFlag(argv: string[], name: string): boolean {
@@ -376,7 +409,7 @@ function atomicCapabilities(): string[] {
     "零件长宽高、实体体积、表面积与复杂度",
     "最小毛坯形状/尺寸/体积/密度/重量",
     "显式方料/圆料输入，以及实际加工毛坯的输入尺寸、解析方向和质量",
-    "H2 原始刀路总工时与粗加工/半精加工/精加工等实际分阶段工时",
+    "H2 原始总工时、六阶段工时，以及孔加工/粗加工/精加工/倒角去毛刺四类 CNC 工时",
     "三/五轴类别、H2 推荐路线、实际采用路线、时间口径与三轴装夹次数",
     "DFM findings/建议/关联 3D 节点",
     "3D 预览与缩略图",
@@ -430,7 +463,15 @@ function formatPart(item: AnalysisResult): string[] {
     if (machiningStock) {
       lines.push(`- 实际加工毛坯：${machiningStock.shape}（${machiningStock.source}）；输入 ${machiningStock.input_size_mm.join(" × ")} mm；解析 ${machiningStock.resolved_size_mm.join(" × ")} mm；轴向 [${machiningStock.axis.join(", ")}]；包络${machiningStock.envelope_contains_part ? "通过" : "失败"}`);
     }
-    lines.push(`- H2 原始刀路总工时：${item.machining.total_processing} 小时；估算等级：${item.machining.estimate_grade ?? "未知"}`);
+    lines.push(`- H2 原始刀路总工时：${formatHoursAsMinutes(item.machining.total_processing)} 分钟；估算等级：${item.machining.estimate_grade ?? "未知"}`);
+    const cnc = item.machining.cnc_breakdown_minutes;
+    if (cnc) {
+      lines.push("- CNC 分类工时（与阶段工时是同一总工时的另一种归类，不重复相加）：");
+      lines.push(`  - 孔加工（含螺纹）：${formatMinutes(cnc.holemaking)} 分钟`);
+      lines.push(`  - 粗加工（含半精加工）：${formatMinutes(cnc.roughing)} 分钟`);
+      lines.push(`  - 精加工：${formatMinutes(cnc.finishing)} 分钟`);
+      lines.push(`  - 倒角去毛刺：${formatMinutes(cnc.deburring)} 分钟`);
+    }
     if (route) {
       lines.push(`- 加工类别：${routeLabel(route.machining_class)}；H2 推荐路线：${routeLabel(route.recommended_route?.route_class)}；实际采用路线：${route.manual_quote_required ? "需要人工报价" : routeLabel(route.selected_route?.route_class)}；时间口径：${route.time_basis}`);
       if (route.selected_route?.route_class === "mill_3axis" && route.setup_count !== undefined) lines.push(`- 三轴装夹：${route.setup_count} 次`);
@@ -438,7 +479,8 @@ function formatPart(item: AnalysisResult): string[] {
     } else {
       lines.push("- 路线状态：旧结果未提供路线投影；为避免误报价，Skill 不应计算本地价格");
     }
-    for (const stage of item.machining.stages ?? []) lines.push(`  - ${stageLabel(stage.code)}：${stage.hours} 小时`);
+    if (item.machining.stages?.length) lines.push("- 规划阶段工时：");
+    for (const stage of item.machining.stages ?? []) lines.push(`  - ${stageLabel(stage.code)}：${formatHoursAsMinutes(stage.hours)} 分钟`);
   }
   const findings = publicFindings(item);
   if (findings.length) lines.push("- DFM 风险：", ...findings.map((finding) => `  - ${finding}`));
@@ -451,12 +493,26 @@ function routeLabel(value: string | undefined): string {
 }
 
 function publicFindings(item: AnalysisResult): string[] {
-  const values = [...(item.dfm?.findings ?? []).map((finding) => finding.message_cn || finding.message_en || finding.code), ...(item.dfm?.warnings ?? []), ...(item.dfm?.suggestions ?? [])].filter(Boolean);
+  const values = [
+    ...(item.dfm?.findings ?? [])
+      .filter((finding) => !isSetupCountDfmCode(finding.code))
+      .map((finding) => finding.message_cn || finding.message_en || finding.code),
+    ...(item.dfm?.warnings ?? []).filter((warning) => !isSetupCountDfmText(warning)),
+    ...(item.dfm?.suggestions ?? []).filter((suggestion) => !isSetupCountDfmText(suggestion)),
+  ].filter(Boolean);
   return [...new Set(values)];
 }
 
 function stageLabel(code: string): string {
   return ({ roughing: "粗加工", semi_finishing: "半精加工", finishing: "精加工", holemaking: "孔加工", threading: "螺纹", machine_actions: "机内动作" } as Record<string, string>)[code] ?? code;
+}
+
+function formatHoursAsMinutes(hours: number): string {
+  return formatMinutes(hours * 60);
+}
+
+function formatMinutes(minutes: number): string {
+  return minutes.toFixed(3).replace(/\.?(?:0+)$/, "");
 }
 
 function formatCostProfile(profile: CostProfile): string {

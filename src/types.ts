@@ -104,6 +104,13 @@ export interface MachiningTime {
   setup_count?: number;
   estimate_grade?: string;
   stages?: Array<{ code: string; hours: number }>;
+  /** Alternative minute classification of the same raw total; do not add to stages. */
+  cnc_breakdown_minutes?: {
+    holemaking: number;
+    roughing: number;
+    finishing: number;
+    deburring: number;
+  };
   total_processing: number;
   route?: AutoCamRouteProjection;
   stock?: MachiningStock;

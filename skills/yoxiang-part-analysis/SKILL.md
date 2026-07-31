@@ -13,7 +13,7 @@ Use the YoxiangAI public service for manufacturing analysis only. It never retur
 - Read part bounding-box dimensions, solid volume, surface area, and complexity.
 - Read minimum stock shape, dimensions, volume, density, and mass.
 - Submit a known block or cylindrical blank and read its declared dimensions, resolved orientation, containment proof, actual volume, and mass separately from minimum stock.
-- Read H2 raw toolpath total/stage times, machining class, recommended route, selected route, time basis, three-axis setup count, and estimate grade.
+- Read H2 raw toolpath total/stage times and the four-category CNC breakdown (holemaking, roughing, finishing, deburring), plus machining class, recommended route, selected route, time basis, three-axis setup count, and estimate grade.
 - Read structured DFM findings, suggestions, and associated 3D node IDs.
 - Read 3D preview and thumbnail state and links.
 - Configure/show local fixed fees, hourly/setup rates, material prices, and stock adjustments.
@@ -54,7 +54,7 @@ yoxiang analyze "/exact/path/b.step" --stock-cylinder 60 25 --wait --compact-jso
 
 `--stock-box` and `--stock-cylinder` are mutually exclusive. One stock flag applies to every explicitly listed file in that CLI invocation, so split the batch when files have different blanks. If the explicit blank does not contain the part, report `AUTOCAM_INVALID_STOCK`; do not retry without the blank.
 
-Always use `--compact-json` for normal analysis and status polling. It returns `agent-summary-v1`, keeps every batch item in input order, and limits only verbose DFM text, node IDs, and excess stage entries. Check every `*_omitted` field and state the omitted count when it is non-zero. Never use raw analysis `--json` by default: it can exhaust the Agent tool-output budget before later files appear. Use raw `--json` only when the user explicitly requests the complete machine payload for debugging; redirect it to a file instead of printing it into the conversation. Do not rerun an analysis merely to recover omitted detail; use the public result page.
+Always use `--compact-json` for normal analysis and status polling. It returns `agent-summary-v2`, keeps every batch item in input order, expresses machining time as `total_processing_minutes`, `stages[].minutes`, and `cnc_breakdown_minutes`, and limits only verbose DFM text, node IDs, and excess stage entries. Check every `*_omitted` field and state the omitted count when it is non-zero. Never use full analysis `--json` by default: although `cli-json-v2` also normalizes all machining time to minutes, it can exhaust the Agent tool-output budget before later files appear. Use `--json` only when the user explicitly requests the complete machine payload for debugging; redirect it to a file instead of printing it into the conversation. Do not rerun an analysis merely to recover omitted detail; use the public result page.
 
 When the user asks for one category from an existing batch, query the batch without uploading again:
 
@@ -63,7 +63,7 @@ yoxiang analyze status <batch-id> --extract dfm
 yoxiang analyze status <batch-id> --extract route
 ```
 
-`--extract` is an independent bounded JSON output mode; never combine it with `--compact-json` or `--json`. It accepts only `overview`, `geometry`, `stock`, `machining`, `route`, `dfm`, or `preview` and returns that category for every part in input order. Do not use extraction for a requested local cost estimate because the calculation requires geometry/stock and machining/route together.
+`--extract` is an independent bounded JSON output mode; never combine it with `--compact-json` or `--json`. It returns `agent-extract-v2`, accepts only `overview`, `geometry`, `stock`, `machining`, `route`, `dfm`, or `preview`, and returns that category for every part in input order. Machining extraction uses minutes. Do not use extraction for a requested local cost estimate because the calculation requires geometry/stock and machining/route together.
 
 Add `--material`, `--process`, `--tolerance`, or `--surface-roughness` only when the user explicitly overrides a default. Do not run `doctor` or `analyze options` first. Use `doctor` only after installation or connection failure; use `analyze options` only when an explicit non-default value cannot be mapped.
 
@@ -77,7 +77,7 @@ Keep the stock meanings separate:
 - `machining.stock` is the blank actually used by AutoCam. Show `source`, `input_size_mm`, `resolved_size_mm`, `axis`, and `envelope_contains_part`.
 - For a provided block, preserve `input_size_mm` order and use `resolved_size_mm` to explain the selected X/Y/Z permutation. Do not reorder the user's declared value in the request.
 
-Treat `machining.total_processing` and every `machining.stages[].hours` value as H2 raw toolpath time. Use `machining.route` as the route authority:
+Treat `machining.total_processing_minutes`, every `machining.stages[].minutes` value, and every `machining.cnc_breakdown_minutes` value as H2 raw toolpath time. `machining.cnc_breakdown_minutes` is an alternative classification of the same total: semi-finishing belongs to roughing, threading belongs to holemaking, and deburring includes only geometrically evidenced edge breaks and hole-mouth chamfers. Its four values sum to `total_processing_minutes`; never add them to `stages`. If the field is absent in a legacy result, say the detailed CNC breakdown is unavailable rather than inventing it. Use `machining.route` as the route authority:
 
 - Show `machining_class`, `recommended_route`, `selected_route`, and `time_basis` without rewriting the H2 recommendation.
 - When H2 recommends five-axis but `selected_route.route_class` is `mill_3axis`, explain that the platform selected the executable three-axis alternative and keep the five-axis recommendation visible.
@@ -144,7 +144,7 @@ For each design and requested quantity `q`, calculate:
 total = startup_fee_per_design
       + programming_fee_per_design
       + q × (
-          total_processing_hours × machine_hour_rate
+          total_processing_minutes / 60 × machine_hour_rate
           + setup_count × setup_fee_per_setup
           + adjusted_stock_mass_kg × material_price_per_kg
         )
@@ -161,7 +161,7 @@ total = startup_fee_per_design
 
 1. Public share link validity (seven days) and preview availability.
 2. Per-part dimensions, solid volume, surface area, complexity, geometry minimum stock, then actual machining stock with input/resolved direction.
-3. H2 raw total/stage toolpath time, machining class, H2 recommendation, selected route, time basis, and three-axis setup count when applicable.
+3. H2 raw total/stage toolpath time, the four-category CNC breakdown including deburring when available, machining class, H2 recommendation, selected route, time basis, and three-axis setup count when applicable.
 4. Prominent DFM findings and any component gaps.
 5. When price was requested: per-design local cost inputs and breakdown, quantity, final two-decimal total, then batch total.
 
@@ -176,13 +176,13 @@ npm install -g @yoxiang/cli@latest
 yoxiang install --agent codex
 ```
 
-Use `--agent claude` or `--agent all` only when named. For updates run `yoxiang update --agent codex --json`. Do not check for updates before a normal analysis. The retired `yoxiang quote` command is intentionally local-only and exits with code `4`.
+Use `--agent claude` or `--agent all` only when named. For updates run `yoxiang update --agent codex --json`. The CLI performs a cached version check only after a successful public API request. If any human or structured result contains an update notice, tell the user which version is available and show its exact update command; do not install it unless the user requests the update. Do not run a separate version check before normal analysis. The retired `yoxiang quote` command is intentionally local-only and exits with code `4`.
 
 After a successful install, respond in the user's current language and do not merely say that installation finished. Summarize these capabilities:
 
 - Upload only explicitly named STEP/STP files without scanning directories or adjacent files.
 - Return part dimensions and solid volume, plus geometry minimum-stock facts and the separate actual machining-stock source/input/resolved direction/volume/mass.
-- Return H2 raw total machining time and the actual roughing, semi-finishing, finishing, holemaking, or other stage times present in the result; never promise or invent a missing stage.
+- Return H2 raw total machining time, the actual planner stage times, and the four-category CNC breakdown including deburring when present; never promise or invent a missing category.
 - Return three/five-axis classification, H2 recommended route, selected route, time basis, three-axis setup count when applicable, estimate grade, structured DFM risks/suggestions, and 3D preview/thumbnail links.
 
 Also state that the public service returns no price. If the cost profile is missing, offer to configure startup, programming, machine-hour, setup, and material rates only when the user wants a local estimate. Rates stay on the user's machine. Do not block the installation-complete response by asking for rates when no estimate was requested.

@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { checkForUpdate, compareVersions, installGlobalUpdate } from "./update.js";
+import { checkForUpdate, checkForUpdateNotice, compareVersions, installGlobalUpdate } from "./update.js";
 
 describe("CLI version comparison", () => {
   it.each([
@@ -37,6 +37,86 @@ describe("CLI version comparison", () => {
         current_version: "0.5.0",
         target_version: "0.5.1",
         update_available: true,
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  });
+
+  it("reuses a fresh cached update notice without contacting the registry", async () => {
+    const root = await mkdtemp(join(tmpdir(), "yoxiang-update-notice-cache-"));
+    const cachePath = join(root, "update-check.json");
+    await writeFile(cachePath, JSON.stringify({
+      checked_at_ms: 1000,
+      current_version: "0.6.1",
+      latest_version: "0.6.2",
+      update_available: true,
+    }));
+
+    await expect(checkForUpdateNotice("0.6.1", {
+      cachePath,
+      nowMs: 2000,
+      registry: "http://127.0.0.1:1",
+    })).resolves.toEqual({
+      update_available: true,
+      current_version: "0.6.1",
+      latest_version: "0.6.2",
+      command: "yoxiang update --agent codex",
+    });
+  });
+
+  it("checks a stale cache once and persists the result for later requests", async () => {
+    let requestCount = 0;
+    const server = createServer((_request, response) => {
+      requestCount += 1;
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ "dist-tags": { latest: "0.6.2" } }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("test server failed to listen");
+    const root = await mkdtemp(join(tmpdir(), "yoxiang-update-notice-refresh-"));
+    const cachePath = join(root, "update-check.json");
+    const registry = `http://127.0.0.1:${address.port}`;
+    try {
+      const first = await checkForUpdateNotice("0.6.1", { cachePath, nowMs: 100_000, registry });
+      const second = await checkForUpdateNotice("0.6.1", { cachePath, nowMs: 101_000, registry });
+      expect(first).toMatchObject({ latest_version: "0.6.2" });
+      expect(second).toEqual(first);
+      expect(requestCount).toBe(1);
+      expect(JSON.parse(await readFile(cachePath, "utf8"))).toMatchObject({
+        current_version: "0.6.1",
+        latest_version: "0.6.2",
+        update_available: true,
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  });
+
+  it("fails open and caches a registry failure without breaking the caller", async () => {
+    const server = createServer((_request, response) => {
+      response.statusCode = 503;
+      response.end("unavailable");
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("test server failed to listen");
+    const root = await mkdtemp(join(tmpdir(), "yoxiang-update-notice-failure-"));
+    const cachePath = join(root, "update-check.json");
+    try {
+      await expect(checkForUpdateNotice("0.6.1", {
+        cachePath,
+        nowMs: 100_000,
+        registry: `http://127.0.0.1:${address.port}`,
+      })).resolves.toBeUndefined();
+      expect(JSON.parse(await readFile(cachePath, "utf8"))).toMatchObject({
+        current_version: "0.6.1",
+        check_failed: true,
       });
     } finally {
       await new Promise<void>((resolve, reject) =>
