@@ -81,7 +81,7 @@ Treat `machining.total_processing_minutes`, every `machining.stages[].minutes` v
 
 - Show `machining_class`, `recommended_route`, `selected_route`, and `time_basis` without rewriting the H2 recommendation.
 - When H2 recommends five-axis but `selected_route.route_class` is `mill_3axis`, explain that the platform selected the executable three-axis alternative and keep the five-axis recommendation visible.
-- Show `setup_count` only when the selected route is executable `mill_3axis`. When `setup_count_basis == learned_prediction_v1`, label it as predicted, also show `physical_setup_count`, confidence and validation status. Never describe `development_only_unvalidated` as certified. When the basis is `physical_fallback`, show the fallback reason.
+- Show `setup_count` only when the selected route is executable `mill_3axis`. It is always the machine-learning prediction; show its confidence and validation status. Never describe `development_only_unvalidated` as certified. If the prediction is unavailable, treat machining as unavailable and never substitute another setup count.
 - When `manual_quote_required` is true, or no selected executable three-axis route exists, show the manual reason codes and never invent a setup count or price.
 - Treat a legacy result without `machining.route` as analysis-only; do not calculate a local price from it.
 

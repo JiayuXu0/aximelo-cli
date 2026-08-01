@@ -45,8 +45,12 @@ describe("compact agent analysis output", () => {
     expect(compact.batch.items[0]?.machining).toMatchObject({
       stages_omitted: 8,
       total_processing_minutes: 90,
+      setup_count: 2,
+      setup_count_confidence: 0.9,
       cnc_breakdown_minutes: { holemaking: 15, roughing: 45, finishing: 24, deburring: 6 },
     });
+    expect(serialized).not.toContain("physical_setup_count");
+    expect(serialized).not.toContain("setup_count_basis");
     expect(serialized).not.toContain("signed-preview-url");
     expect(serialized).not.toContain("signed-thumbnail-url");
     expect(serialized).not.toContain("SETUP_COUNT_EXCESSIVE");
@@ -193,6 +197,17 @@ function part(index: number): AnalysisResult {
     machining: {
       total_processing: 1.5,
       estimate_grade: "trusted",
+      setup_count: 2,
+      setup_count_confidence: 0.9,
+      setup_prediction: {
+        status: "learned_prediction",
+        predicted_count: 2,
+        model_version: "as-setup-ordinal-hybrid-development-v1",
+        model_sha256: "e".repeat(64),
+        feature_schema_version: "autocam.setup-count-features.as-hybrid.v3",
+        deployment_status: "authoritative_unverified",
+        validation_status: "development_only_unvalidated",
+      },
       cnc_breakdown_minutes: { holemaking: 15, roughing: 45, finishing: 24, deburring: 6 },
       stages: Array.from({ length: 20 }, (_, stage) => ({ code: `stage-${stage}`, hours: 0.1 })),
       route: {
@@ -200,6 +215,7 @@ function part(index: number): AnalysisResult {
         time_basis: "toolpath",
         toolpath_executable: true,
         setup_count: 2,
+        setup_count_confidence: 0.9,
         manual_quote_required: false,
         recommended_route: route(),
         selected_route: route(),
