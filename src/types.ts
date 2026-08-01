@@ -95,13 +95,32 @@ export interface AutoCamRouteProjection {
   time_basis: string;
   toolpath_executable: boolean;
   setup_count?: number;
+  setup_count_basis?: "learned_prediction_v1" | "physical_fallback";
+  setup_count_confidence?: number;
+  physical_setup_count?: number;
+  setup_prediction?: SetupPrediction;
   manual_quote_required: boolean;
   manual_quote_reason_codes?: string[];
+}
+
+export interface SetupPrediction {
+  status: string;
+  predicted_count: number | null;
+  model_version: string | null;
+  model_sha256: string | null;
+  feature_schema_version: string | null;
+  deployment_status: "disabled" | "shadow" | "authoritative" | "authoritative_unverified";
+  validation_status: "not_applicable" | "development_only_unvalidated" | "validation_certified";
+  fallback_reason: string | null;
 }
 
 export interface MachiningTime {
   source?: "autocam";
   setup_count?: number;
+  setup_count_basis?: "learned_prediction_v1" | "physical_fallback";
+  setup_count_confidence?: number;
+  physical_setup_count?: number;
+  setup_prediction?: SetupPrediction;
   estimate_grade?: string;
   stages?: Array<{ code: string; hours: number }>;
   /** Alternative minute classification of the same raw total; do not add to stages. */

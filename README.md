@@ -1,6 +1,6 @@
 # @yoxiang/cli
 
-YoxiangAI 公开零件制造分析 CLI 与 Agent Skill。CLI 以分钟展示 H2 原始刀路总工时、六阶段工时，以及孔加工/粗加工/精加工/倒角去毛刺四类 CNC 工时，并返回几何、几何最小毛坯、实际加工毛坯及解析方向、三/五轴推荐与实际路线、三轴装夹、DFM 和 3D 结果；仅对实际采用的可执行三轴路线，Agent 才使用本机费率按公开固定公式计算。
+YoxiangAI 公开零件制造分析 CLI 与 Agent Skill。CLI 以分钟展示 H2 原始刀路总工时、六阶段工时，以及孔加工/粗加工/精加工/倒角去毛刺四类 CNC 工时，并返回几何、几何最小毛坯、实际加工毛坯及解析方向、三/五轴推荐与实际路线、预测装夹与物理规划装夹、DFM 和 3D 结果；仅对实际采用的可执行三轴路线，Agent 才使用本机费率按公开固定公式计算。当前 AS-hybrid v3c 装夹模型是 development-only 最佳候选，CLI 会明确显示未做 validation 认证，不将其描述为 certified。
 
 ```bash
 npm install -g @yoxiang/cli@latest

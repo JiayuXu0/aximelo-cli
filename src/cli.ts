@@ -474,7 +474,22 @@ function formatPart(item: AnalysisResult): string[] {
     }
     if (route) {
       lines.push(`- 加工类别：${routeLabel(route.machining_class)}；H2 推荐路线：${routeLabel(route.recommended_route?.route_class)}；实际采用路线：${route.manual_quote_required ? "需要人工报价" : routeLabel(route.selected_route?.route_class)}；时间口径：${route.time_basis}`);
-      if (route.selected_route?.route_class === "mill_3axis" && route.setup_count !== undefined) lines.push(`- 三轴装夹：${route.setup_count} 次`);
+      if (route.selected_route?.route_class === "mill_3axis" && route.setup_count !== undefined) {
+        const basis = item.machining.setup_count_basis ?? route.setup_count_basis;
+        const confidence = item.machining.setup_count_confidence ?? route.setup_count_confidence;
+        const physical = item.machining.physical_setup_count ?? route.physical_setup_count;
+        const prediction = item.machining.setup_prediction ?? route.setup_prediction;
+        if (basis === "learned_prediction_v1") {
+          const confidenceText = confidence === undefined ? "未知" : `${(confidence * 100).toFixed(1)}%`;
+          lines.push(`- 预测装夹：${route.setup_count} 次；物理规划：${physical ?? route.setup_count} 次；置信度：${confidenceText}`);
+          if (prediction?.validation_status === "development_only_unvalidated") {
+            lines.push(`  - 模型：${prediction.model_version ?? "未知"}（当前最佳 development-only，未做 validation 认证）`);
+          }
+        } else {
+          const reason = prediction?.fallback_reason ? `；原因：${prediction.fallback_reason}` : "";
+          lines.push(`- 装夹：${route.setup_count} 次（物理回退${reason}）`);
+        }
+      }
       if (route.manual_quote_required) lines.push(`- 报价状态：需要人工报价；CLI/Skill 不计算本地价格${route.manual_quote_reason_codes?.length ? `（${route.manual_quote_reason_codes.join("、")}）` : ""}`);
     } else {
       lines.push("- 路线状态：旧结果未提供路线投影；为避免误报价，Skill 不应计算本地价格");

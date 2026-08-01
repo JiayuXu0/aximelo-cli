@@ -23,10 +23,10 @@ describe("CLI integration", () => {
     await expect(access(join(isolatedHome, ".codex"))).rejects.toBeDefined();
   });
 
-  it("prints stable version 0.6.2 without contacting the API", () => {
+  it("prints stable version 0.6.3 without contacting the API", () => {
     const result = spawnSync(process.execPath, ["dist/cli.js", "--version"], { cwd: process.cwd(), encoding: "utf8", env: { ...process.env, YOXIANG_API_BASE_URL: "http://127.0.0.1:1" } });
     expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe("0.6.2");
+    expect(result.stdout.trim()).toBe("0.6.3");
   });
 
   it("rejects raw and compact JSON together before network access", () => {
