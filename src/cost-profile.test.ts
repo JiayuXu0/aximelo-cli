@@ -8,7 +8,7 @@ describe("local cost profile", () => {
   let previous: string | undefined;
   beforeEach(async () => {
     previous = process.env.XDG_CONFIG_HOME;
-    process.env.XDG_CONFIG_HOME = await mkdtemp(join(tmpdir(), "yoxiang-cost-"));
+    process.env.XDG_CONFIG_HOME = await mkdtemp(join(tmpdir(), "aximelo-cost-"));
   });
   afterEach(() => {
     if (previous === undefined) delete process.env.XDG_CONFIG_HOME;

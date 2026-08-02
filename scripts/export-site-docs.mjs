@@ -6,11 +6,11 @@ import { execFileSync } from "node:child_process";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const frontendRoot = resolve(process.argv[2] ?? join(repositoryRoot, "..", "poieza-quote-frontend"));
-const outputRoot = join(frontendRoot, "apps", "web", "public", "open", "part-analysis-cli");
+const outputRoot = join(frontendRoot, "apps", "web", "public", "open", "aximelo-cli");
 const installationSource = join(repositoryRoot, "docs", "installation.md");
-const skillSource = join(repositoryRoot, "skills", "yoxiang-part-analysis", "SKILL.md");
+const skillSource = join(repositoryRoot, "skills", "aximelo", "SKILL.md");
 const installationTarget = join(outputRoot, "installation.md");
-const skillTarget = join(outputRoot, "skills", "yoxiang-part-analysis", "SKILL.md");
+const skillTarget = join(outputRoot, "skills", "aximelo", "SKILL.md");
 
 await mkdir(dirname(skillTarget), { recursive: true });
 await cp(installationSource, installationTarget);
@@ -25,12 +25,12 @@ const manifest = {
     dist_tag: "latest",
   },
   source: {
-    repository: "https://github.com/JiayuXu0/yoxiang-quote-cli",
+    repository: "https://github.com/JiayuXu0/aximelo-cli",
     commit: sourceCommit,
   },
   files: {
     "installation.md": { sha256: await sha256(installationTarget) },
-    "skills/yoxiang-part-analysis/SKILL.md": { sha256: await sha256(skillTarget) },
+    "skills/aximelo/SKILL.md": { sha256: await sha256(skillTarget) },
   },
 };
 await writeFile(join(outputRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
@@ -41,7 +41,7 @@ async function sha256(path) {
 }
 
 function getSourceCommit(cwd) {
-  if (process.env.YOXIANG_QUOTE_CLI_SOURCE_COMMIT) return process.env.YOXIANG_QUOTE_CLI_SOURCE_COMMIT;
+  if (process.env.AXIMELO_CLI_SOURCE_COMMIT) return process.env.AXIMELO_CLI_SOURCE_COMMIT;
   try {
     return execFileSync("git", ["rev-parse", "HEAD"], { cwd, encoding: "utf8" }).trim();
   } catch {

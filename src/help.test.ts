@@ -24,7 +24,7 @@ describe("hierarchical help", () => {
     expect(HELP.root).toContain("最多每 24 小时检查一次 npm");
     expect(HELP.root).toContain("只提示，不自动安装");
     expect(HELP.root).toContain("倒角去毛刺四类 CNC 工时");
-    expect(HELP.root).not.toContain("yoxiang convert");
+    expect(HELP.root).not.toContain("aximelo convert");
     expect(JSON.stringify(HELP)).not.toContain("HOOPS");
     expect(HELP.analyze).toContain("CLI 不提供派生 CAD 文件下载");
   });

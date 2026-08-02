@@ -1,11 +1,11 @@
 ---
-name: yoxiang-part-analysis
-description: Analyze explicitly provided STEP/STP or supported native single-part CAD files with YoxiangAI and optionally calculate a local estimate only for an executable selected three-axis route using the user's saved cost profile. Use for part dimensions, minimum stock, raw H2 toolpath time and stages, three/five-axis routes, three-axis setup count, DFM, 3D preview, local cost estimates, or Yoxiang CLI installation/update requests.
+name: aximelo
+description: Analyze explicitly provided STEP/STP or supported native single-part CAD files with Aximelo and optionally calculate a local estimate only for an executable selected three-axis route using the user's saved cost profile. Use for part dimensions, minimum stock, raw H2 toolpath time and stages, three/five-axis routes, three-axis setup count, DFM, 3D preview, local cost estimates, or Aximelo CLI installation/update requests.
 ---
 
-# YoxiangAI Part Analysis
+# Aximelo Part Analysis
 
-Use the YoxiangAI public service for manufacturing analysis only. It never returns a price or lead time. When the user asks for a cost estimate, calculate it directly from the analysis result and the private cost profile stored on the user's machine; never upload those rates.
+Use the Aximelo public service for manufacturing analysis only. It never returns a price or lead time. When the user asks for a cost estimate, calculate it directly from the analysis result and the private cost profile stored on the user's machine; never upload those rates.
 
 ## Atomic capabilities
 
@@ -30,7 +30,7 @@ Use the YoxiangAI public service for manufacturing analysis only. It never retur
 - When the user, workbook, drawing, or another authoritative source gives the blank, pass it explicitly. Never omit a known blank and never replace a missing or invalid blank with minimum/derived stock when reproducing a labeled evaluation.
 - Do not call ERP, debug, internal quote, or retired public quote endpoints. Do not expose internal algorithms, traces, storage paths, or rules.
 - Do not call standalone CAD conversion endpoints, offer format conversion, or download derived CAD files. Native-CAD preprocessing exists only inside the manufacturing-analysis and formal quotation workflows.
-- Present machining results to the user as YoxiangAI output. Never repeat an internal producer name from a raw `source` value or error code.
+- Present machining results to the user as Aximelo output. Never repeat an internal producer name from a raw `source` value or error code.
 - Treat the output and any locally calculated cost as an estimate, not an order or binding offer.
 - The public share link, including its 3D access, is valid for seven days. Do not describe this as the retention period for uploaded files or stored analysis results. Remind the user not to upload a model they are not authorized to share.
 
@@ -39,25 +39,25 @@ Use the YoxiangAI public service for manufacturing analysis only. It never retur
 For up to five exact paths, run the analysis exactly once:
 
 ```bash
-yoxiang analyze "/exact/path/a.step" "/exact/path/b.stp" --wait --compact-json
+aximelo analyze "/exact/path/a.step" "/exact/path/b.stp" --wait --compact-json
 ```
 
 Native single-part CAD uses the same analysis command and may report `source_format`. If internal input processing fails, report `CAD_INPUT_PROCESSING_FAILED`; do not expose the converter, offer a derived STEP, retry by renaming the extension, or silently switch to another converter.
 
 ```bash
-yoxiang analyze "/exact/path/native.x_t" --wait --compact-json
+aximelo analyze "/exact/path/native.x_t" --wait --compact-json
 ```
 
 For known block dimensions, their order is nominal and does not assert X/Y/Z. AutoCam resolves the enclosing axis permutation:
 
 ```bash
-yoxiang analyze "/exact/path/a.step" --stock-box 20 868 175 --wait --compact-json
+aximelo analyze "/exact/path/a.step" --stock-box 20 868 175 --wait --compact-json
 ```
 
 For known cylindrical stock:
 
 ```bash
-yoxiang analyze "/exact/path/b.step" --stock-cylinder 60 25 --wait --compact-json
+aximelo analyze "/exact/path/b.step" --stock-cylinder 60 25 --wait --compact-json
 ```
 
 `--stock-box` and `--stock-cylinder` are mutually exclusive. One stock flag applies to every explicitly listed file in that CLI invocation, so split the batch when files have different blanks. If the explicit blank does not contain the part, report `AUTOCAM_INVALID_STOCK`; do not retry without the blank.
@@ -67,8 +67,8 @@ Always use `--compact-json` for normal analysis and status polling. It returns `
 When the user asks for one category from an existing batch, query the batch without uploading again:
 
 ```bash
-yoxiang analyze status <batch-id> --extract dfm
-yoxiang analyze status <batch-id> --extract route
+aximelo analyze status <batch-id> --extract dfm
+aximelo analyze status <batch-id> --extract route
 ```
 
 `--extract` is an independent bounded JSON output mode; never combine it with `--compact-json` or `--json`. It returns `agent-extract-v2`, accepts only `overview`, `geometry`, `stock`, `machining`, `route`, `dfm`, or `preview`, and returns that category for every part in input order. Machining extraction uses minutes. Do not use extraction for a requested local cost estimate because the calculation requires geometry/stock and machining/route together.
@@ -98,10 +98,10 @@ Treat `machining.total_processing_minutes`, every `machining.stages[].minutes` v
 After the single analysis call, read the profile once:
 
 ```bash
-yoxiang cost-profile show --json
+aximelo cost-profile show --json
 ```
 
-The file is `${XDG_CONFIG_HOME:-~/.config}/yoxiang/cost-profile.json` on POSIX and `%APPDATA%\\yoxiang\\cost-profile.json` on Windows. It is mode `0600` on POSIX.
+The file is `${XDG_CONFIG_HOME:-~/.config}/aximelo/cost-profile.json` on POSIX and `%APPDATA%\\aximelo\\cost-profile.json` on Windows. It is mode `0600` on POSIX.
 
 If `cost_profile` is `missing` and a price is requested, stop and ask one blocking question for all five values:
 
@@ -114,13 +114,13 @@ If `cost_profile` is `missing` and a price is requested, stop and ask one blocki
 After the user answers, save them with one non-interactive command:
 
 ```bash
-yoxiang cost-profile configure --startup-fee <n> --programming-fee <n> --machine-hour-rate <n> --setup-fee <n> --material 6061 --price-per-kg <n> --currency CNY --json
+aximelo cost-profile configure --startup-fee <n> --programming-fee <n> --machine-hour-rate <n> --setup-fee <n> --material 6061 --price-per-kg <n> --currency CNY --json
 ```
 
 If the analyzed material is absent from `materials`, stop and ask its CNY/kg price, then append it:
 
 ```bash
-yoxiang cost-profile material set <material> --price-per-kg <n> --json
+aximelo cost-profile material set <material> --price-per-kg <n> --json
 ```
 
 Never infer or invent a rate. Updating the CLI or Skill must not replace an existing profile.
@@ -173,18 +173,18 @@ total = startup_fee_per_design
 4. Prominent DFM findings and any component gaps.
 5. When price was requested: per-design local cost inputs and breakdown, quantity, final two-decimal total, then batch total.
 
-Never describe the locally calculated amount as a price returned or approved by Yoxiang's server.
+Never describe the locally calculated amount as a price returned or approved by Aximelo's server.
 
 ## Install and update
 
 Install or refresh the Skill only when requested:
 
 ```bash
-npm install -g @yoxiang/cli@latest
-yoxiang install --agent codex
+npm install -g @aximelo/cli@latest
+aximelo install --agent codex
 ```
 
-Use `--agent claude` or `--agent all` only when named. For updates run `yoxiang update --agent codex --json`. The CLI performs a cached version check only after a successful public API request. If any human or structured result contains an update notice, tell the user which version is available and show its exact update command; do not install it unless the user requests the update. Do not run a separate version check before normal analysis. The retired `yoxiang quote` command is intentionally local-only and exits with code `4`.
+Use `--agent claude` or `--agent all` only when named. For updates run `aximelo update --agent codex --json`. The CLI performs a cached version check only after a successful public API request. If any human or structured result contains an update notice, tell the user which version is available and show its exact update command; do not install it unless the user requests the update. Do not run a separate version check before normal analysis. The retired `aximelo quote` command is intentionally local-only and exits with code `4`.
 
 After a successful install, respond in the user's current language and do not merely say that installation finished. Summarize these capabilities:
 

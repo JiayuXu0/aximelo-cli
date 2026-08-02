@@ -46,7 +46,7 @@ describe("CLI version comparison", () => {
   });
 
   it("reuses a fresh cached update notice without contacting the registry", async () => {
-    const root = await mkdtemp(join(tmpdir(), "yoxiang-update-notice-cache-"));
+    const root = await mkdtemp(join(tmpdir(), "aximelo-update-notice-cache-"));
     const cachePath = join(root, "update-check.json");
     await writeFile(cachePath, JSON.stringify({
       checked_at_ms: 1000,
@@ -63,7 +63,7 @@ describe("CLI version comparison", () => {
       update_available: true,
       current_version: "0.6.1",
       latest_version: "0.6.2",
-      command: "yoxiang update --agent codex",
+      command: "aximelo update --agent codex",
     });
   });
 
@@ -77,7 +77,7 @@ describe("CLI version comparison", () => {
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("test server failed to listen");
-    const root = await mkdtemp(join(tmpdir(), "yoxiang-update-notice-refresh-"));
+    const root = await mkdtemp(join(tmpdir(), "aximelo-update-notice-refresh-"));
     const cachePath = join(root, "update-check.json");
     const registry = `http://127.0.0.1:${address.port}`;
     try {
@@ -106,7 +106,7 @@ describe("CLI version comparison", () => {
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("test server failed to listen");
-    const root = await mkdtemp(join(tmpdir(), "yoxiang-update-notice-failure-"));
+    const root = await mkdtemp(join(tmpdir(), "aximelo-update-notice-failure-"));
     const cachePath = join(root, "update-check.json");
     try {
       await expect(checkForUpdateNotice("0.6.1", {
@@ -127,14 +127,14 @@ describe("CLI version comparison", () => {
 
   it("installs the selected channel and refreshes the requested Skill", async () => {
     if (process.platform === "win32") return;
-    const root = await mkdtemp(join(tmpdir(), "yoxiang-update-"));
+    const root = await mkdtemp(join(tmpdir(), "aximelo-update-"));
     const bin = join(root, "bin");
     const globalRoot = join(root, "global");
     const invocationLog = join(root, "updated-cli.log");
     const npmLog = join(root, "npm.log");
-    const updatedCLI = join(globalRoot, "@yoxiang", "cli", "dist", "cli.js");
+    const updatedCLI = join(globalRoot, "@aximelo", "cli", "dist", "cli.js");
     await mkdir(bin, { recursive: true });
-    await mkdir(join(globalRoot, "@yoxiang", "cli", "dist"), { recursive: true });
+    await mkdir(join(globalRoot, "@aximelo", "cli", "dist"), { recursive: true });
     await writeFile(
       join(bin, "npm"),
       `#!/bin/sh\nprintf '%s\\n' "$*" >> ${JSON.stringify(npmLog)}\nif [ "$1" = "root" ]; then printf '%s\\n' ${JSON.stringify(globalRoot)}; fi\n`,
@@ -153,7 +153,7 @@ describe("CLI version comparison", () => {
         "0.5.1",
       );
       expect(await readFile(npmLog, "utf8")).toContain(
-        "install --global @yoxiang/cli@latest --registry=https://registry.example",
+        "install --global @aximelo/cli@latest --registry=https://registry.example",
       );
       expect(await readFile(invocationLog, "utf8")).toContain("install --agent codex --json");
     } finally {

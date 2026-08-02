@@ -9,7 +9,7 @@ describe("compact agent analysis output", () => {
       batch_id: "batch-1",
       status: "completed_with_gaps",
       result_path: "/tools/part-analysis/results/batch-1",
-      result_url: "https://test.yoxiang.cn/zh/tools/part-analysis/results/batch-1",
+      result_url: "https://app.aximelo.ai/zh/tools/part-analysis/results/batch-1",
       items,
       requested_at: "2026-07-30T00:00:00Z",
       expires_at: "2026-08-06T00:00:00Z",

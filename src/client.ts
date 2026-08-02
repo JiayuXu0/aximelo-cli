@@ -10,8 +10,8 @@ import type {
   StockInput,
 } from "./types.js";
 
-export const DEFAULT_API_BASE_URL = "https://quote-test-api.yoxiang.cn";
-export const DEFAULT_RESULT_BASE_URL = "https://test.yoxiang.cn";
+export const DEFAULT_API_BASE_URL = "https://api.aximelo.ai";
+export const DEFAULT_RESULT_BASE_URL = "https://app.aximelo.ai";
 export const MAX_FILE_BYTES = 10_485_760;
 export const MAX_CONCURRENT_PARTS = 5;
 const STEP_ANALYSIS_EXTENSIONS = [".step", ".stp"] as const;
@@ -184,7 +184,7 @@ export class AnalysisClient {
     try {
       response = await this.fetchImpl(`${this.baseUrl}${path}`, init);
     } catch (error) {
-      throw new CliError("无法连接有象零件分析服务。", 5, error);
+      throw new CliError("无法连接Aximelo 零件分析服务。", 5, error);
     }
     const raw = await response.text();
     const body = raw ? safeJson(raw) : undefined;

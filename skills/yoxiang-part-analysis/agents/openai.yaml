@@ -1,4 +1,0 @@
-interface:
-  display_name: "YoxiangAI 零件分析"
-  short_description: "分析 H2 原始工时与三五轴路线，仅三轴可做本地成本估算"
-  default_prompt: "Use $yoxiang-part-analysis to analyze the explicitly provided single-part CAD files, explain H2 route selection, and calculate a local estimate only for a selected executable three-axis route."

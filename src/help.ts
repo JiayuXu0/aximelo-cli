@@ -1,4 +1,4 @@
-export const CLI_VERSION = "0.7.1";
+export const CLI_VERSION = "1.0.0";
 
 const shared = `默认分析参数：6061 铝、CNC、ISO 2768-m、Ra 3.2。
 限制：每个零件文件不超过 10 MiB；每批最多 5 个零件。
@@ -14,28 +14,28 @@ const shared = `默认分析参数：6061 铝、CNC、ISO 2768-m、Ra 3.2。
   5  网络、服务端或分析失败`;
 
 export const HELP = {
-  root: `YoxiangAI 零件分析 CLI ${CLI_VERSION}
+  root: `Aximelo 零件分析 CLI ${CLI_VERSION}
 
 用法：
-  yoxiang analyze <file.step> [more.stp ...] [--wait] [--compact-json|--json|--extract section]
-  yoxiang analyze status <batch-id> [--wait] [--compact-json|--json|--extract section]
-  yoxiang analyze options [--json]
-  yoxiang cost-profile configure
-  yoxiang cost-profile show [--json]
-  yoxiang cost-profile material set <material> --price-per-kg <value>
-  yoxiang cost-profile stock-adjustment set [options]
-  yoxiang doctor
-  yoxiang install --agent codex|claude|all
-  yoxiang update [--check]
+  aximelo analyze <file.step> [more.stp ...] [--wait] [--compact-json|--json|--extract section]
+  aximelo analyze status <batch-id> [--wait] [--compact-json|--json|--extract section]
+  aximelo analyze options [--json]
+  aximelo cost-profile configure
+  aximelo cost-profile show [--json]
+  aximelo cost-profile material set <material> --price-per-kg <value>
+  aximelo cost-profile stock-adjustment set [options]
+  aximelo doctor
+  aximelo install --agent codex|claude|all
+  aximelo update [--check]
 
 说明：服务端只做制造分析。仅当实际采用路线是可执行三轴时，Agent 才能使用本机 cost-profile 按固定公式计算；五轴或人工报价路线不计算价格，费率不会上传。
-旧 yoxiang quote 已停用，调用时不发送网络请求并返回退出码 4。
+旧 aximelo quote 已停用，调用时不发送网络请求并返回退出码 4。
 
 ${shared}`,
   analyze: `分析一个或多个明确指定的受支持单零件文件；一个文件也使用单元素批次。原生 CAD 的必要预处理仅用于制造分析，CLI 不提供派生 CAD 文件下载。
 
 用法：
-  yoxiang analyze <file...> [options]
+  aximelo analyze <file...> [options]
 
 参数：
   --material <code>           默认 6061
@@ -56,35 +56,35 @@ ${shared}`,
   options: `查询公开材料、工艺、公差、粗糙度、文件限制和制造分析能力。
 
 用法：
-  yoxiang analyze options [--json] [--api-base <url>]`,
+  aximelo analyze options [--json] [--api-base <url>]`,
   status: `查询分析批次状态；--wait 会持续轮询到 completed、completed_with_gaps、failed 或 expired。
 
 用法：
-  yoxiang analyze status <batch-id> [--wait] [--compact-json|--json|--extract section] [--api-base <url>]`,
-  costProfile: `管理仅保存在本机的成本参数。POSIX 路径为 \${XDG_CONFIG_HOME:-~/.config}/yoxiang/cost-profile.json，Windows 路径为 %APPDATA%\\yoxiang\\cost-profile.json。
+  aximelo analyze status <batch-id> [--wait] [--compact-json|--json|--extract section] [--api-base <url>]`,
+  costProfile: `管理仅保存在本机的成本参数。POSIX 路径为 \${XDG_CONFIG_HOME:-~/.config}/aximelo/cost-profile.json，Windows 路径为 %APPDATA%\\aximelo\\cost-profile.json。
 
 用法：
-  yoxiang cost-profile configure [--startup-fee N --programming-fee N --machine-hour-rate N --setup-fee N --material 6061 --price-per-kg N --currency CNY]
-  yoxiang cost-profile show [--json]
-  yoxiang cost-profile material set <material> --price-per-kg <value>
-  yoxiang cost-profile stock-adjustment set [--block-allowance-per-side-mm N] [--cylinder-radial-allowance-mm N] [--cylinder-end-allowance-mm N] [--round-up-mm N]
+  aximelo cost-profile configure [--startup-fee N --programming-fee N --machine-hour-rate N --setup-fee N --material 6061 --price-per-kg N --currency CNY]
+  aximelo cost-profile show [--json]
+  aximelo cost-profile material set <material> --price-per-kg <value>
+  aximelo cost-profile stock-adjustment set [--block-allowance-per-side-mm N] [--cylinder-radial-allowance-mm N] [--cylinder-end-allowance-mm N] [--round-up-mm N]
 
 configure 不带参数时在交互终端依次询问开机固定费、编程费、机时费、装夹费和 6061 材料单价。所有值可为 0；默认币种 CNY。
 默认长方体单边余量、圆柱径向余量和圆柱端面余量均为 3 mm；默认取整粒度为 0。配置文件在 POSIX 上以 0600 保存。`,
-  doctor: `检查 YoxiangAI 公开制造分析服务连通性和能力；不读取或上传零件文件。
+  doctor: `检查 Aximelo 公开制造分析服务连通性和能力；不读取或上传零件文件。
 
 用法：
-  yoxiang doctor [--json] [--api-base <url>]`,
-  install: `安装 yoxiang-part-analysis Skill，并列出全部原子能力。
+  aximelo doctor [--json] [--api-base <url>]`,
+  install: `安装 aximelo Skill，并列出全部原子能力。
 
 首次交互安装会询问本地费率。--json 或非交互安装不会等待输入，而是返回 cost_profile: missing；Skill 首次算价时再阻塞询问并保存。
 
 用法：
-  yoxiang install --agent codex|claude|all [--json]`,
-  update: `检查或更新 @yoxiang/cli，并刷新 yoxiang-part-analysis Skill。不会覆盖已有本地成本配置。
+  aximelo install --agent codex|claude|all [--json]`,
+  update: `检查或更新 @aximelo/cli，并刷新 aximelo Skill。不会覆盖已有本地成本配置。
 
 用法：
-  yoxiang update [--check] [--agent codex|claude|all] [--json]`,
+  aximelo update [--check] [--agent codex|claude|all] [--json]`,
 } as const;
 
 export type HelpTopic = keyof typeof HELP;

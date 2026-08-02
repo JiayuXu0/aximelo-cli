@@ -31,9 +31,9 @@ export interface ConfigureCostProfileInput {
 
 export function costProfilePath(env: NodeJS.ProcessEnv = process.env): string {
   if (platform() === "win32") {
-    return join(env.APPDATA || join(homedir(), "AppData", "Roaming"), "yoxiang", "cost-profile.json");
+    return join(env.APPDATA || join(homedir(), "AppData", "Roaming"), "aximelo", "cost-profile.json");
   }
-  return join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "yoxiang", "cost-profile.json");
+  return join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "aximelo", "cost-profile.json");
 }
 
 export async function loadCostProfile(): Promise<CostProfile | undefined> {
@@ -96,7 +96,7 @@ export async function setStockAdjustment(input: Partial<CostProfile["stock_adjus
 async function requireCostProfile(): Promise<CostProfile> {
   const profile = await loadCostProfile();
   if (!profile) {
-    throw new CliError("本地成本配置尚未完成，请先运行 yoxiang cost-profile configure。", 4);
+    throw new CliError("本地成本配置尚未完成，请先运行 aximelo cost-profile configure。", 4);
   }
   return profile;
 }

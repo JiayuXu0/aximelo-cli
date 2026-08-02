@@ -69,7 +69,7 @@ async function run(inputArgs: string[]): Promise<void> {
 
     // The retired command deliberately exits before constructing a client or issuing a request.
     if (command === "quote") {
-      throw new CliError("yoxiang quote 已停用且不会发送网络请求。请改用 yoxiang analyze；如需报价，由 Agent 读取本地 cost-profile 后计算。", 4);
+      throw new CliError("aximelo quote 已停用且不会发送网络请求。请改用 aximelo analyze；如需报价，由 Agent 读取本地 cost-profile 后计算。", 4);
     }
 
     if (command === "cost-profile") {
@@ -79,8 +79,8 @@ async function run(inputArgs: string[]): Promise<void> {
 
     if (command === "install") {
       const agent = takeOption(args, "--agent") ?? "codex";
-      if (!isAgent(agent)) throw new CliError("--agent 仅支持 codex、claude 或 all。请运行 yoxiang install --help。", 4);
-      assertNoExtraArgs(args, "yoxiang install --help");
+      if (!isAgent(agent)) throw new CliError("--agent 仅支持 codex、claude 或 all。请运行 aximelo install --help。", 4);
+      assertNoExtraArgs(args, "aximelo install --help");
       const paths = await installSkill(agent);
       const interactive = !json && process.stdin.isTTY && process.stdout.isTTY;
       if (interactive) {
@@ -102,9 +102,9 @@ async function run(inputArgs: string[]): Promise<void> {
       const checkOnly = takeFlag(args, "--check");
       const channel = takeOption(args, "--channel") ?? "latest";
       const agent = takeOption(args, "--agent") ?? "codex";
-      if (!isUpdateChannel(channel)) throw new CliError("正式版 CLI 仅支持 latest 更新通道。请运行 yoxiang update --help。", 4);
-      if (!isAgent(agent)) throw new CliError("--agent 仅支持 codex、claude 或 all。请运行 yoxiang update --help。", 4);
-      assertNoExtraArgs(args, "yoxiang update --help");
+      if (!isUpdateChannel(channel)) throw new CliError("正式版 CLI 仅支持 latest 更新通道。请运行 aximelo update --help。", 4);
+      if (!isAgent(agent)) throw new CliError("--agent 仅支持 codex、claude 或 all。请运行 aximelo update --help。", 4);
+      assertNoExtraArgs(args, "aximelo update --help");
       try {
         const check = await checkForUpdate(CLI_VERSION, channel);
         if (checkOnly) {
@@ -116,28 +116,28 @@ async function run(inputArgs: string[]): Promise<void> {
           emit(json, { ok: true, updated: false, update: check, skill_refreshed: paths }, `${formatUpdateCheck(check)}\nSkill 已刷新；本地成本配置未改动。`);
           return;
         }
-        process.stderr.write(`正在更新有象零件分析 CLI 到 ${check.target_version}，并刷新 Skill…\n`);
+        process.stderr.write(`正在更新Aximelo 零件分析 CLI 到 ${check.target_version}，并刷新 Skill…\n`);
         const version = await installGlobalUpdate(channel, agent);
-        emit(json, { ok: true, updated: true, previous_version: CLI_VERSION, version, channel, agent }, `有象零件分析 CLI 已更新：${CLI_VERSION} -> ${version}\n本地成本配置未改动。`);
+        emit(json, { ok: true, updated: true, previous_version: CLI_VERSION, version, channel, agent }, `Aximelo 零件分析 CLI 已更新：${CLI_VERSION} -> ${version}\n本地成本配置未改动。`);
       } catch (error) {
-        throw new CliError(`CLI 更新失败。请手动运行 npm install -g @yoxiang/cli@${channel}，再运行 yoxiang install --agent ${agent}。`, 5, error);
+        throw new CliError(`CLI 更新失败。请手动运行 npm install -g @aximelo/cli@${channel}，再运行 aximelo install --agent ${agent}。`, 5, error);
       }
       return;
     }
 
-    const apiBase = takeOption(args, "--api-base") ?? process.env.YOXIANG_API_BASE_URL ?? DEFAULT_API_BASE_URL;
-    const resultBase = process.env.YOXIANG_RESULT_BASE_URL ?? DEFAULT_RESULT_BASE_URL;
+    const apiBase = takeOption(args, "--api-base") ?? process.env.AXIMELO_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+    const resultBase = process.env.AXIMELO_RESULT_BASE_URL ?? DEFAULT_RESULT_BASE_URL;
     const client = new AnalysisClient({ baseUrl: apiBase, resultBaseUrl: resultBase });
 
     if (command === "doctor") {
-      assertNoExtraArgs(args, "yoxiang doctor --help");
+      assertNoExtraArgs(args, "aximelo doctor --help");
       const options = await client.options();
       const updateNotice = await checkForCliUpdateNotice();
       emit(json, { ok: true, api_base_url: apiBase, service: "reachable", options }, formatDoctor(options, apiBase), updateNotice);
       return;
     }
 
-    if (command !== "analyze") throw new CliError(`未知命令：${command ?? ""}。请运行 yoxiang --help。`, 4);
+    if (command !== "analyze") throw new CliError(`未知命令：${command ?? ""}。请运行 aximelo --help。`, 4);
     const compactSectionValue = takeOption(args, "--extract");
     let compactSection: CompactSection | undefined;
     if (compactSectionValue !== undefined) {
@@ -150,7 +150,7 @@ async function run(inputArgs: string[]): Promise<void> {
     if (first === "options") {
       if (compactJson || compactSection) throw new CliError("analyze options 不支持紧凑或提取输出；请使用 --json。", 4);
       args.shift();
-      assertNoExtraArgs(args, "yoxiang analyze options --help");
+      assertNoExtraArgs(args, "aximelo analyze options --help");
       const options = await client.options();
       const updateNotice = await checkForCliUpdateNotice();
       emit(json, { ok: true, options }, formatOptions(options), updateNotice);
@@ -160,8 +160,8 @@ async function run(inputArgs: string[]): Promise<void> {
       args.shift();
       const id = args.shift();
       const wait = takeFlag(args, "--wait");
-      if (!id) throw new CliError("status 需要 batch-id。请运行 yoxiang analyze status --help。", 4);
-      assertNoExtraArgs(args, "yoxiang analyze status --help");
+      if (!id) throw new CliError("status 需要 batch-id。请运行 aximelo analyze status --help。", 4);
+      assertNoExtraArgs(args, "aximelo analyze status --help");
       let result = await client.batchStatus(id);
       const updateNoticePromise = checkForCliUpdateNotice();
       if (wait && !isBatchTerminal(result.status)) {
@@ -189,15 +189,15 @@ async function run(inputArgs: string[]): Promise<void> {
         : undefined;
     const wait = takeFlag(args, "--wait");
     if (args.some((arg) => arg.startsWith("-"))) {
-      throw new CliError(`无法识别参数：${args.filter((arg) => arg.startsWith("-")).join(" ")}。请运行 yoxiang analyze --help。`, 4);
+      throw new CliError(`无法识别参数：${args.filter((arg) => arg.startsWith("-")).join(" ")}。请运行 aximelo analyze --help。`, 4);
     }
-    if (args.length === 0) throw new CliError("analyze 需要至少一个明确的零件文件路径。请运行 yoxiang analyze --help。", 4);
+    if (args.length === 0) throw new CliError("analyze 需要至少一个明确的零件文件路径。请运行 aximelo analyze --help。", 4);
 
     if (!structuredOutput) process.stderr.write(`正在校验并提交 ${args.length} 个零件进行制造分析…\n`);
     let result = await client.submitBatch({ filePaths: args, material, process: processName, tolerance, surfaceRoughness, stock });
     const updateNoticePromise = checkForCliUpdateNotice();
     if (wait && !isBatchTerminal(result.status)) {
-      if (!structuredOutput) process.stderr.write(`批次 ${result.batch_id} 已提交，YoxiangAI 正在分析几何、DFM、加工工时和预览…\n`);
+      if (!structuredOutput) process.stderr.write(`批次 ${result.batch_id} 已提交，Aximelo 正在分析几何、DFM、加工工时和预览…\n`);
       let previous = "";
       result = await client.waitBatch(result.batch_id, 10 * 60_000, (current) => {
         if (!structuredOutput && current.status !== previous) {
@@ -218,7 +218,7 @@ async function run(inputArgs: string[]): Promise<void> {
 async function runCostProfile(args: string[], json: boolean): Promise<void> {
   const action = args.shift();
   if (action === "show") {
-    assertNoExtraArgs(args, "yoxiang cost-profile show --help");
+    assertNoExtraArgs(args, "aximelo cost-profile show --help");
     const profile = await loadCostProfile();
     emit(json, { ok: true, cost_profile: profile ?? "missing", path: costProfilePath() }, profile ? formatCostProfile(profile) : `本地成本配置尚未创建：${costProfilePath()}`);
     return;
@@ -238,7 +238,7 @@ async function runCostProfile(args: string[], json: boolean): Promise<void> {
         currency: takeOption(args, "--currency") ?? "CNY",
       };
     }
-    assertNoExtraArgs(args, "yoxiang cost-profile configure --help");
+    assertNoExtraArgs(args, "aximelo cost-profile configure --help");
     const profile = await configureCostProfile(input);
     emit(json, { ok: true, cost_profile: profile, path: costProfilePath() }, formatCostProfile(profile));
     return;
@@ -247,7 +247,7 @@ async function runCostProfile(args: string[], json: boolean): Promise<void> {
     const material = args.shift();
     if (!material) throw new CliError("material set 需要材料代码。", 4);
     const price = requiredNumber(args, "--price-per-kg");
-    assertNoExtraArgs(args, "yoxiang cost-profile material set --help");
+    assertNoExtraArgs(args, "aximelo cost-profile material set --help");
     const profile = await setMaterialPrice(material, price);
     emit(json, { ok: true, cost_profile: profile, path: costProfilePath() }, `已保存 ${material.toUpperCase()} 材料单价：${profile.currency} ${price}/kg`);
     return;
@@ -265,12 +265,12 @@ async function runCostProfile(args: string[], json: boolean): Promise<void> {
       if (value !== undefined) adjustment[key] = value;
     }
     if (Object.keys(adjustment).length === 0) throw new CliError("请至少指定一项毛坯余量或取整粒度。", 4);
-    assertNoExtraArgs(args, "yoxiang cost-profile stock-adjustment set --help");
+    assertNoExtraArgs(args, "aximelo cost-profile stock-adjustment set --help");
     const profile = await setStockAdjustment(adjustment);
     emit(json, { ok: true, cost_profile: profile, path: costProfilePath() }, formatCostProfile(profile));
     return;
   }
-  throw new CliError("未知 cost-profile 子命令。请运行 yoxiang cost-profile --help。", 4);
+  throw new CliError("未知 cost-profile 子命令。请运行 aximelo cost-profile --help。", 4);
 }
 
 async function ensureInstallCostProfile(json: boolean): Promise<"existing" | "configured" | "missing"> {
@@ -281,7 +281,7 @@ async function ensureInstallCostProfile(json: boolean): Promise<"existing" | "co
 }
 
 async function promptCostProfile(): Promise<ConfigureCostProfileInput> {
-  process.stdout.write("成本参数只保存在本机，不会上传。有象分析服务不会返回价格。\n");
+  process.stdout.write("成本参数只保存在本机，不会上传。Aximelo分析服务不会返回价格。\n");
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
     return {
@@ -328,11 +328,11 @@ function withUpdateNotice(payload: unknown, updateNotice?: UpdateNotice): unknow
 }
 
 function formatUpdateNotice(notice: UpdateNotice): string {
-  return `更新提示：发现 Yoxiang CLI ${notice.latest_version}，当前为 ${notice.current_version}。运行：${notice.command}`;
+  return `更新提示：发现 Aximelo CLI ${notice.latest_version}，当前为 ${notice.current_version}。运行：${notice.command}`;
 }
 
 function checkForCliUpdateNotice(): Promise<UpdateNotice | undefined> {
-  const registry = process.env.YOXIANG_NPM_REGISTRY;
+  const registry = process.env.AXIMELO_NPM_REGISTRY;
   return checkForUpdateNotice(CLI_VERSION, registry ? { registry } : {});
 }
 
@@ -392,10 +392,10 @@ function isUpdateChannel(value: string): value is UpdateChannel {
 
 async function installSkill(agent: "codex" | "claude" | "all"): Promise<string[]> {
   const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-  const source = join(packageRoot, "skills", "yoxiang-part-analysis");
+  const source = join(packageRoot, "skills", "aximelo");
   const targets: string[] = [];
-  if (agent === "codex" || agent === "all") targets.push(join(homedir(), ".codex", "skills", "yoxiang-part-analysis"));
-  if (agent === "claude" || agent === "all") targets.push(join(homedir(), ".claude", "skills", "yoxiang-part-analysis"));
+  if (agent === "codex" || agent === "all") targets.push(join(homedir(), ".codex", "skills", "aximelo"));
+  if (agent === "claude" || agent === "all") targets.push(join(homedir(), ".claude", "skills", "aximelo"));
   for (const target of targets) {
     await mkdir(dirname(target), { recursive: true });
     await cp(source, target, { recursive: true, force: true });
@@ -420,7 +420,7 @@ function atomicCapabilities(): string[] {
 
 function formatInstall(paths: string[], profile: string, includeCapabilities: boolean): string {
   return [
-    `yoxiang-part-analysis Skill 已安装：`,
+    `aximelo Skill 已安装：`,
     ...paths.map((path) => `- ${path}`),
     ...(includeCapabilities ? ["", "可用原子能力：", ...atomicCapabilities().map((item) => `- ${item}`)] : []),
     "",
@@ -437,7 +437,7 @@ function formatUpdateCheck(check: { channel: UpdateChannel; current_ahead: boole
 }
 
 function formatDoctor(options: AnalysisOptions, apiBase: string): string {
-  return ["YoxiangAI 零件分析 CLI 状态正常", `API：${apiBase}`, `支持：${options.supported_extensions.join("、")}`, `单文件上限：${options.max_file_bytes.toLocaleString()} bytes（10 MiB）`, "服务端只返回制造分析，不返回价格或交期。"].join("\n");
+  return ["Aximelo 零件分析 CLI 状态正常", `API：${apiBase}`, `支持：${options.supported_extensions.join("、")}`, `单文件上限：${options.max_file_bytes.toLocaleString()} bytes（10 MiB）`, "服务端只返回制造分析，不返回价格或交期。"].join("\n");
 }
 
 function formatOptions(options: AnalysisOptions): string {

@@ -7,7 +7,7 @@ import { AnalysisClient, CliError, inspectFile, inspectFiles, MAX_CONCURRENT_PAR
 
 describe("explicit STEP file validation", () => {
   it("hashes an explicitly named STEP file", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "yoxiang-cli-"));
+    const directory = await mkdtemp(join(tmpdir(), "aximelo-cli-"));
     const file = join(directory, "part.step");
     const content = "ISO-10303-21;\nEND-ISO-10303-21;\n";
     await writeFile(file, content);
@@ -19,7 +19,7 @@ describe("explicit STEP file validation", () => {
   });
 
   it("accepts native parts and rejects unsupported files, directories, duplicates, and oversized files", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "yoxiang-cli-paths-"));
+    const directory = await mkdtemp(join(tmpdir(), "aximelo-cli-paths-"));
     const file = join(directory, "part.step");
     const alias = join(directory, "alias.step");
     const folder = join(directory, "folder.step");
@@ -39,7 +39,7 @@ describe("explicit STEP file validation", () => {
   });
 
   it("accepts exactly 10 MiB and rejects a sixth file before reading", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "yoxiang-cli-limit-"));
+    const directory = await mkdtemp(join(tmpdir(), "aximelo-cli-limit-"));
     const accepted = join(directory, "accepted.STEP");
     await writeFile(accepted, Buffer.alloc(MAX_FILE_BYTES, 65));
     await expect(inspectFile(accepted)).resolves.toMatchObject({ size: MAX_FILE_BYTES });
@@ -78,7 +78,7 @@ describe("AnalysisClient", () => {
   });
 
   it("creates one batch, uploads explicit files, and completes the analysis contract", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "yoxiang-analysis-submit-"));
+    const directory = await mkdtemp(join(tmpdir(), "aximelo-analysis-submit-"));
     const first = join(directory, "first.step");
     const second = join(directory, "second.stp");
     const adjacent = join(directory, "adjacent.step");
@@ -101,7 +101,7 @@ describe("AnalysisClient", () => {
 
     await expect(client.submitBatch({ filePaths: [first, second], process: "cnc", stock: { shape: "block", size_mm: [20, 868, 175] } })).resolves.toMatchObject({
       batch_id: "b1",
-      result_url: "https://test.yoxiang.cn/zh/tools/part-analysis/results/b1",
+      result_url: "https://app.aximelo.ai/zh/tools/part-analysis/results/b1",
     });
     expect(fetchImpl.mock.calls[0]?.[0]).toBe("https://api.example.test/v1/public/part-analysis-batches");
     const init = fetchImpl.mock.calls[0]?.[1];
@@ -120,7 +120,7 @@ describe("AnalysisClient", () => {
   });
 
   it("validates the complete batch before any request", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "yoxiang-analysis-validation-"));
+    const directory = await mkdtemp(join(tmpdir(), "aximelo-analysis-validation-"));
     const good = join(directory, "good.step");
     const bad = join(directory, "bad.step");
     await writeFile(good, "ISO-10303-21;");
@@ -132,7 +132,7 @@ describe("AnalysisClient", () => {
   });
 
   it("rejects invalid explicit stock before any request", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "yoxiang-analysis-stock-"));
+    const directory = await mkdtemp(join(tmpdir(), "aximelo-analysis-stock-"));
     const file = join(directory, "part.step");
     await writeFile(file, "ISO-10303-21;");
     const fetchImpl = vi.fn<typeof fetch>();
@@ -145,7 +145,7 @@ describe("AnalysisClient", () => {
   });
 
   it("uses five concurrent upload workers", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "yoxiang-analysis-five-"));
+    const directory = await mkdtemp(join(tmpdir(), "aximelo-analysis-five-"));
     const files = await Promise.all(Array.from({ length: MAX_CONCURRENT_PARTS }, async (_, index) => {
       const file = join(directory, `part-${index}.step`);
       await writeFile(file, `ISO-10303-21;${index}`);

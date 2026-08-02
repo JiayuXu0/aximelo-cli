@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export const NPM_PACKAGE = "@yoxiang/cli";
+export const NPM_PACKAGE = "@aximelo/cli";
 export const NPM_REGISTRY = "https://registry.npmjs.org";
 
 export type UpdateAgent = "codex" | "claude" | "all";
@@ -24,7 +24,7 @@ export type UpdateNotice = {
   update_available: true;
   current_version: string;
   latest_version: string;
-  command: "yoxiang update --agent codex";
+  command: "aximelo update --agent codex";
 };
 
 type UpdateNoticeState = {
@@ -54,7 +54,7 @@ export async function checkForUpdate(
   registry = NPM_REGISTRY,
   signal?: AbortSignal,
 ): Promise<UpdateCheck> {
-  const response = await fetch(`${registry.replace(/\/$/, "")}/@yoxiang%2Fcli`, {
+  const response = await fetch(`${registry.replace(/\/$/, "")}/@aximelo%2Fcli`, {
     headers: { accept: "application/vnd.npm.install-v1+json" },
     signal,
   });
@@ -73,7 +73,7 @@ export async function checkForUpdate(
 }
 
 export function updateNoticePath(env: NodeJS.ProcessEnv = process.env): string {
-  return join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "yoxiang", "update-check.json");
+  return join(env.XDG_CONFIG_HOME || join(homedir(), ".config"), "aximelo", "update-check.json");
 }
 
 export async function checkForUpdateNotice(
@@ -130,7 +130,7 @@ export async function installGlobalUpdate(
   const { stdout: globalRootOutput } = await execFileAsync(npm, ["root", "--global"], {
     maxBuffer: 1024 * 1024,
   });
-  const updatedCLI = join(globalRootOutput.trim(), "@yoxiang", "cli", "dist", "cli.js");
+  const updatedCLI = join(globalRootOutput.trim(), "@aximelo", "cli", "dist", "cli.js");
   const { stdout: versionOutput } = await execFileAsync(process.execPath, [updatedCLI, "--version"], {
     maxBuffer: 1024 * 1024,
   });
@@ -173,7 +173,7 @@ function noticeFromState(state: UpdateNoticeState): UpdateNotice | undefined {
     update_available: true,
     current_version: state.current_version,
     latest_version: state.latest_version,
-    command: "yoxiang update --agent codex",
+    command: "aximelo update --agent codex",
   };
 }
 
