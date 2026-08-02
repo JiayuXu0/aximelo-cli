@@ -1,6 +1,6 @@
 ---
 name: yoxiang-part-analysis
-description: Analyze explicitly provided STEP/STP or supported native single-part CAD files with YoxiangAI, convert native CAD to STEP AP214, and optionally calculate a local estimate only for an executable selected three-axis route using the user's saved cost profile. Use for CAD-to-STEP conversion, part dimensions, minimum stock, raw H2 toolpath time and stages, three/five-axis routes, three-axis setup count, DFM, 3D preview, local cost estimates, or Yoxiang CLI installation/update requests.
+description: Analyze explicitly provided STEP/STP or supported native single-part CAD files with YoxiangAI and optionally calculate a local estimate only for an executable selected three-axis route using the user's saved cost profile. Use for part dimensions, minimum stock, raw H2 toolpath time and stages, three/five-axis routes, three-axis setup count, DFM, 3D preview, local cost estimates, or Yoxiang CLI installation/update requests.
 ---
 
 # YoxiangAI Part Analysis
@@ -9,8 +9,7 @@ Use the YoxiangAI public service for manufacturing analysis only. It never retur
 
 ## Atomic capabilities
 
-- Analyze one to five explicitly named supported single-part CAD files in one batch; STEP/STP pass through and native CAD is converted before analysis.
-- Convert an explicit mixed batch to STEP AP214 with `yoxiang convert`; validate and copy STEP/STP locally without uploading them.
+- Analyze one to five explicitly named supported single-part CAD files in one batch; the service handles any required native-CAD preprocessing only as an internal analysis step.
 - Read part bounding-box dimensions, solid volume, surface area, and complexity.
 - Read minimum stock shape, dimensions, volume, density, and mass.
 - Submit a known block or cylindrical blank and read its declared dimensions, resolved orientation, containment proof, actual volume, and mass separately from minimum stock.
@@ -30,6 +29,7 @@ Use the YoxiangAI public service for manufacturing analysis only. It never retur
 - Defaults are material `6061`, process `cnc-machining`, tolerance `ISO2768-m`, and roughness `Ra3.2`. Do not ask about omitted manufacturing parameters.
 - When the user, workbook, drawing, or another authoritative source gives the blank, pass it explicitly. Never omit a known blank and never replace a missing or invalid blank with minimum/derived stock when reproducing a labeled evaluation.
 - Do not call ERP, debug, internal quote, or retired public quote endpoints. Do not expose internal algorithms, traces, storage paths, or rules.
+- Do not call standalone CAD conversion endpoints, offer format conversion, or download derived CAD files. Native-CAD preprocessing exists only inside the manufacturing-analysis and formal quotation workflows.
 - Present machining results to the user as YoxiangAI output. Never repeat an internal producer name from a raw `source` value or error code.
 - Treat the output and any locally calculated cost as an estimate, not an order or binding offer.
 - The public share link, including its 3D access, is valid for seven days. Do not describe this as the retention period for uploaded files or stored analysis results. Remind the user not to upload a model they are not authorized to share.
@@ -42,16 +42,10 @@ For up to five exact paths, run the analysis exactly once:
 yoxiang analyze "/exact/path/a.step" "/exact/path/b.stp" --wait --compact-json
 ```
 
-Native single-part CAD uses the same command and automatically reports `source_format` plus `conversion` status. If conversion fails, report `CAD_CONVERSION_FAILED`; do not retry by renaming the extension or silently switch to another converter.
+Native single-part CAD uses the same analysis command and may report `source_format`. If internal input processing fails, report `CAD_INPUT_PROCESSING_FAILED`; do not expose the converter, offer a derived STEP, retry by renaming the extension, or silently switch to another converter.
 
 ```bash
 yoxiang analyze "/exact/path/native.x_t" --wait --compact-json
-```
-
-When the user explicitly asks for STEP files, use the standalone conversion command. The output directory must be explicit. It rejects duplicate output stems and existing output files before creating a remote task, never overwrites, and returns `cli-convert-json-v1` without the process-only download token or object-storage URLs:
-
-```bash
-yoxiang convert "/exact/path/native.x_t" "/exact/path/baseline.step" --output-dir "/exact/output" --json
 ```
 
 For known block dimensions, their order is nominal and does not assert X/Y/Z. AutoCam resolves the enclosing axis permutation:
@@ -195,7 +189,7 @@ Use `--agent claude` or `--agent all` only when named. For updates run `yoxiang 
 After a successful install, respond in the user's current language and do not merely say that installation finished. Summarize these capabilities:
 
 - Upload only explicitly named supported single-part CAD files without scanning directories or adjacent files; reject assemblies and meshes.
-- Explain that STEP/STP pass through, native CAD converts before analysis, and `yoxiang convert` can explicitly download AP214 STEP without exposing its download token.
+- Explain that supported native single-part CAD can be used as analysis input, while internal preprocessing and derived CAD files are not exposed or downloadable through the public CLI/Skill.
 - Return part dimensions and solid volume, plus geometry minimum-stock facts and the separate actual machining-stock source/input/resolved direction/volume/mass.
 - Return H2 raw total machining time, the actual planner stage times, and the four-category CNC breakdown including deburring when present; never promise or invent a missing category.
 - Return three/five-axis classification, H2 recommended route, selected route, time basis, three-axis setup count when applicable, estimate grade, structured DFM risks/suggestions, and 3D preview/thumbnail links.

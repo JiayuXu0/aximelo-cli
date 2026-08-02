@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { access, mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -51,72 +51,30 @@ describe("explicit STEP file validation", () => {
 });
 
 describe("AnalysisClient", () => {
-  it("preflights output collisions before creating a conversion task", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "yoxiang-convert-collision-"));
-    const output = join(directory, "out");
-    const first = join(directory, "part.x_t");
-    const second = join(directory, "part.sat");
-    await writeFile(first, "parasolid");
-    await writeFile(second, "acis");
-    const fetchImpl = vi.fn<typeof fetch>();
+  it("hides internal CAD preprocessing details from public options and results", async () => {
+    const result = batchResult("b1", "completed_with_gaps");
+    result.items = [{
+      analysis_id: "a1", status: "completed_with_gaps", file_name: "part.x_t", source_format: "x_t",
+      material: "6061", process: "cnc-machining", conversion: { status: "failed", error_code: "CAD_CONVERSION_FAILED" },
+      components: {
+        geometry: { status: "failed", error_code: "CAD_CONVERSION_FAILED" }, dfm: { status: "unavailable" },
+        machining: { status: "unavailable" }, preview: { status: "unavailable" },
+      }, requested_at: "2026-07-23T00:00:00Z", expires_at: "2026-07-30T00:00:00Z",
+    }];
+    const fetchImpl = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({
+        supported_extensions: [".step", ".x_t"], passthrough_extensions: [".step"], conversion_extensions: [".x_t"],
+        max_file_bytes: MAX_FILE_BYTES, materials: [], processes: [],
+      }))
+      .mockResolvedValueOnce(jsonResponse(result));
     const client = new AnalysisClient({ baseUrl: "https://api.example.test", fetchImpl });
-    await expect(client.convertFiles({ filePaths: [first, second], outputDir: output })).rejects.toMatchObject({ exitCode: 4 });
-    expect(fetchImpl).not.toHaveBeenCalled();
-  });
-
-  it("converts native CAD and locally copies STEP in one batch without exposing the token", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "yoxiang-convert-mixed-"));
-    const output = join(directory, "out");
-    const native = join(directory, "native.x_t");
-    const step = join(directory, "baseline.stp");
-    await writeFile(native, "parasolid");
-    await writeFile(step, "ISO-10303-21;baseline");
-    const fetchImpl = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(jsonResponse({
-        batch_id: "c1", status: "awaiting_upload", download_token: "secret-download-token",
-        items: [{ item_id: "i1", file_name: "native.x_t", status: "awaiting_upload", upload_url: "https://upload.example.test/native", upload_method: "PUT" }],
-        expires_at: "2026-08-02T02:00:00Z",
-      }, 201))
-      .mockResolvedValueOnce(new Response(null, { status: 200 }))
-      .mockResolvedValueOnce(jsonResponse({
-        batch_id: "c1", status: "completed", expires_at: "2026-08-02T02:00:00Z",
-        items: [{ item_id: "i1", file_name: "native.x_t", source_format: "x_t", status: "succeeded" }],
-      }, 202))
-      .mockResolvedValueOnce(new Response("ISO-10303-21;converted", { status: 200 }));
-    const result = await new AnalysisClient({ baseUrl: "https://api.example.test", fetchImpl }).convertFiles({
-      filePaths: [native, step], outputDir: output,
-    });
-    expect(result).toMatchObject({ format: "cli-convert-json-v1", status: "completed", items: [{ conversion: "hoops" }, { conversion: "passthrough" }] });
-    expect(JSON.stringify(result)).not.toContain("secret-download-token");
-    expect(await readFile(join(output, "native.step"), "utf8")).toContain("ISO-10303-21");
-    expect(await readFile(join(output, "baseline.step"), "utf8")).toContain("baseline");
-    expect(fetchImpl.mock.calls[3]?.[1]?.headers).toEqual({ authorization: "Bearer secret-download-token" });
-  });
-
-  it("removes an invalid downloaded STEP instead of leaving a corrupt output", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "yoxiang-convert-invalid-step-"));
-    const output = join(directory, "out");
-    const native = join(directory, "native.sat");
-    await writeFile(native, "acis");
-    const fetchImpl = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(jsonResponse({
-        batch_id: "c2", status: "awaiting_upload", download_token: "download-token",
-        items: [{ item_id: "i2", file_name: "native.sat", status: "awaiting_upload", upload_url: "https://upload.example.test/native", upload_method: "PUT" }],
-        expires_at: "2026-08-02T02:00:00Z",
-      }, 201))
-      .mockResolvedValueOnce(new Response(null, { status: 200 }))
-      .mockResolvedValueOnce(jsonResponse({
-        batch_id: "c2", status: "completed", expires_at: "2026-08-02T02:00:00Z",
-        items: [{ item_id: "i2", file_name: "native.sat", source_format: "sat", status: "succeeded" }],
-      }, 202))
-      .mockResolvedValueOnce(new Response("not a STEP file", { status: 200 }));
-
-    await expect(new AnalysisClient({ baseUrl: "https://api.example.test", fetchImpl }).convertFiles({
-      filePaths: [native], outputDir: output,
-    })).rejects.toMatchObject({ exitCode: 4 });
-    await expect(access(join(output, "native.step"))).rejects.toBeDefined();
+    const options = await client.options();
+    expect(options).not.toHaveProperty("passthrough_extensions");
+    expect(options).not.toHaveProperty("conversion_extensions");
+    const status = await client.batchStatus("b1");
+    expect(status.items[0]).not.toHaveProperty("conversion");
+    expect(status.items[0]?.components.geometry.error_code).toBe("CAD_INPUT_PROCESSING_FAILED");
+    expect(JSON.stringify(status)).not.toContain("CAD_CONVERSION_FAILED");
   });
 
   it("creates one batch, uploads explicit files, and completes the analysis contract", async () => {

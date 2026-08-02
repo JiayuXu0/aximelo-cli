@@ -129,19 +129,6 @@ async function run(inputArgs: string[]): Promise<void> {
     const resultBase = process.env.YOXIANG_RESULT_BASE_URL ?? DEFAULT_RESULT_BASE_URL;
     const client = new AnalysisClient({ baseUrl: apiBase, resultBaseUrl: resultBase });
 
-    if (command === "convert") {
-      const outputDir = takeOption(args, "--output-dir");
-      if (!outputDir) throw new CliError("convert 需要 --output-dir <目录>。请运行 yoxiang convert --help。", 4);
-      if (args.some((arg) => arg.startsWith("-"))) {
-        throw new CliError(`无法识别参数：${args.filter((arg) => arg.startsWith("-")).join(" ")}。请运行 yoxiang convert --help。`, 4);
-      }
-      if (args.length === 0) throw new CliError("convert 需要至少一个零件文件。", 4);
-      if (!json) process.stderr.write(`正在校验并转换 ${args.length} 个零件…\n`);
-      const result = await client.convertFiles({ filePaths: args, outputDir });
-      emit(json, result, formatConvertResult(result.items));
-      return;
-    }
-
     if (command === "doctor") {
       assertNoExtraArgs(args, "yoxiang doctor --help");
       const options = await client.options();
@@ -226,10 +213,6 @@ async function run(inputArgs: string[]): Promise<void> {
     else process.stderr.write(`错误：${cliError.message}\n`);
     process.exitCode = cliError.exitCode;
   }
-}
-
-function formatConvertResult(items: Array<{ source_file: string; output_file: string; conversion: string }>): string {
-  return ["STEP 转换完成：", ...items.map((item) => `- ${item.source_file} -> ${item.output_file}（${item.conversion === "passthrough" ? "直接复制" : "HOOPS AP214"}）`)].join("\n");
 }
 
 async function runCostProfile(args: string[], json: boolean): Promise<void> {
@@ -423,7 +406,7 @@ async function installSkill(agent: "codex" | "claude" | "all"): Promise<string[]
 function atomicCapabilities(): string[] {
   return [
     "只上传明确指定的受支持单零件 CAD 文件，不扫描目录或相邻文件",
-    "STEP/STP 直通分析，原生 CAD 自动转 STEP 后分析，并可显式下载 AP214 STEP",
+    "支持 STEP/STP 与受支持原生单零件作为制造分析输入；内部派生文件不对外下载",
     "零件长宽高、实体体积、表面积与复杂度",
     "最小毛坯形状/尺寸/体积/密度/重量",
     "显式方料/圆料输入，以及实际加工毛坯的输入尺寸、解析方向和质量",
@@ -460,9 +443,7 @@ function formatDoctor(options: AnalysisOptions, apiBase: string): string {
 function formatOptions(options: AnalysisOptions): string {
   return [
     "默认：6061 / cnc-machining / ISO2768-m / Ra3.2",
-    `直通格式：${(options.passthrough_extensions ?? []).join("、") || "未提供"}`,
-    `自动转换格式：${(options.conversion_extensions ?? []).join("、") || "未提供"}`,
-    `兼容格式全集：${options.supported_extensions.join("、")}`,
+    `支持零件格式：${options.supported_extensions.join("、")}`,
     "可用材料：",
     ...options.materials.map((item) => `- ${item.value}: ${item.label}`),
     "可用工艺：",
@@ -479,9 +460,6 @@ function formatAnalysisResult(result: AnalysisBatchResult): string {
 function formatPart(item: AnalysisResult): string[] {
   const lines = [`${item.file_name}（${item.status}）`];
   if (item.source_format) lines.push(`- 源格式：${item.source_format}`);
-  if (item.conversion && item.conversion.status !== "not_required") {
-    lines.push(`- STEP 转换：${item.conversion.status}${item.conversion.error_code ? `（${item.conversion.error_code}）` : ""}`);
-  }
   if (item.geometry) {
     lines.push(`- 零件尺寸：${item.geometry.length_mm} × ${item.geometry.width_mm} × ${item.geometry.height_mm} mm`);
     lines.push(`- 实体体积：${item.geometry.volume_cm3} cm³；表面积：${item.geometry.surface_area_cm2} cm²；复杂度：${item.geometry.complexity_level} (${item.geometry.complexity_score})`);

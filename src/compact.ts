@@ -105,7 +105,6 @@ function compactPart(item: AnalysisResult, index: number) {
     file_name: item.file_name,
     status: item.status,
     source_format: item.source_format,
-    conversion: item.conversion,
     material: item.material,
     process: item.process,
     tolerance: item.tolerance,

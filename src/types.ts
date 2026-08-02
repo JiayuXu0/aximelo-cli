@@ -12,8 +12,6 @@ export interface AnalysisOptions {
   tolerances?: Array<{ value: string; label: string }>;
   max_file_bytes: number;
   supported_extensions: string[];
-  passthrough_extensions?: string[];
-  conversion_extensions?: string[];
   supported_stock_shapes?: Array<"block" | "cylinder">;
   defaults?: {
     material: string;
@@ -22,53 +20,6 @@ export interface AnalysisOptions {
     surface_roughness: string;
   };
   capabilities?: Record<string, boolean | number | null>;
-}
-
-export interface CadConversionUploadIntent {
-  item_id: string;
-  file_name: string;
-  status: "awaiting_upload";
-  upload_method: "PUT";
-  upload_url: string;
-  required_headers?: Record<string, string>;
-}
-
-export interface CadConversionBatchIntent {
-  batch_id: string;
-  status: "awaiting_upload";
-  download_token: string;
-  items: CadConversionUploadIntent[];
-  expires_at: string;
-}
-
-export interface CadConversionItem {
-  item_id: string;
-  file_name: string;
-  status: "awaiting_upload" | "converting" | "succeeded" | "failed";
-  source_format: string;
-  error_code?: string;
-}
-
-export interface CadConversionBatch {
-  batch_id: string;
-  status: "awaiting_upload" | "processing" | "completed" | "completed_with_errors" | "failed" | "expired";
-  items: CadConversionItem[];
-  expires_at: string;
-}
-
-export interface CliConvertItem {
-  source_file: string;
-  output_file: string;
-  source_format: string;
-  conversion: "passthrough" | "hoops";
-  status: "succeeded";
-}
-
-export interface CliConvertResult {
-  ok: boolean;
-  format: "cli-convert-json-v1";
-  status: "completed";
-  items: CliConvertItem[];
 }
 
 export type StockInput =
@@ -226,10 +177,6 @@ export interface AnalysisResult {
     preview: AnalysisComponent;
   };
   source_format?: string;
-  conversion?: {
-    status: "not_required" | "pending" | "running" | "succeeded" | "failed";
-    error_code?: string;
-  };
   machining?: MachiningTime;
   geometry?: AnalysisGeometry;
   dfm?: AnalysisDfm;

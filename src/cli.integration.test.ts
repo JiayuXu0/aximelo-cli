@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 const helpCommands = [
   ["--help"], ["help"], ["help", "analyze"], ["analyze", "--help"],
   ["analyze", "options", "--help"], ["analyze", "status", "--help"],
-  ["convert", "--help"], ["cost-profile", "--help"], ["doctor", "--help"], ["install", "--help"], ["update", "--help"],
+  ["cost-profile", "--help"], ["doctor", "--help"], ["install", "--help"], ["update", "--help"],
 ];
 
 describe("CLI integration", () => {
@@ -23,10 +23,19 @@ describe("CLI integration", () => {
     await expect(access(join(isolatedHome, ".codex"))).rejects.toBeDefined();
   });
 
-  it("prints stable version 0.7.0 without contacting the API", () => {
+  it("prints stable version 0.7.1 without contacting the API", () => {
     const result = spawnSync(process.execPath, ["dist/cli.js", "--version"], { cwd: process.cwd(), encoding: "utf8", env: { ...process.env, YOXIANG_API_BASE_URL: "http://127.0.0.1:1" } });
     expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe("0.7.0");
+    expect(result.stdout.trim()).toBe("0.7.1");
+  });
+
+  it("does not expose the retired standalone conversion command", () => {
+    const result = spawnSync(process.execPath, ["dist/cli.js", "convert", "part.x_t", "--output-dir", "out"], {
+      cwd: process.cwd(), encoding: "utf8", env: { ...process.env, YOXIANG_API_BASE_URL: "http://127.0.0.1:1" },
+    });
+    expect(result.status).toBe(4);
+    expect(result.stderr).toContain("未知命令");
+    expect(result.stderr).not.toContain("HOOPS");
   });
 
   it("rejects raw and compact JSON together before network access", () => {
@@ -85,7 +94,7 @@ describe("CLI integration", () => {
     const payload = JSON.parse(result.stdout);
     expect(payload).toMatchObject({ ok: true, cost_profile: "missing" });
     expect(payload.capabilities).toContain("只上传明确指定的受支持单零件 CAD 文件，不扫描目录或相邻文件");
-    expect(payload.capabilities).toContain("STEP/STP 直通分析，原生 CAD 自动转 STEP 后分析，并可显式下载 AP214 STEP");
+    expect(payload.capabilities).toContain("支持 STEP/STP 与受支持原生单零件作为制造分析输入；内部派生文件不对外下载");
     expect(payload.capabilities).toContain("最小毛坯形状/尺寸/体积/密度/重量");
     expect(payload.capabilities).toContain("H2 原始总工时、六阶段工时，以及孔加工/粗加工/精加工/倒角去毛刺四类 CNC 工时");
     expect(payload.capabilities).toContain("仅对实际采用的可执行三轴路线做本地透明成本估算");

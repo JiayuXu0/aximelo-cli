@@ -1,4 +1,4 @@
-export const CLI_VERSION = "0.7.0";
+export const CLI_VERSION = "0.7.1";
 
 const shared = `默认分析参数：6061 铝、CNC、ISO 2768-m、Ra 3.2。
 限制：每个零件文件不超过 10 MiB；每批最多 5 个零件。
@@ -20,7 +20,6 @@ export const HELP = {
   yoxiang analyze <file.step> [more.stp ...] [--wait] [--compact-json|--json|--extract section]
   yoxiang analyze status <batch-id> [--wait] [--compact-json|--json|--extract section]
   yoxiang analyze options [--json]
-  yoxiang convert <file...> --output-dir <directory> [--json]
   yoxiang cost-profile configure
   yoxiang cost-profile show [--json]
   yoxiang cost-profile material set <material> --price-per-kg <value>
@@ -33,7 +32,7 @@ export const HELP = {
 旧 yoxiang quote 已停用，调用时不发送网络请求并返回退出码 4。
 
 ${shared}`,
-  analyze: `分析一个或多个明确指定的零件文件；一个文件也使用单元素批次。STEP/STP 直通，原生 CAD 自动转为私有 STEP 后继续分析。
+  analyze: `分析一个或多个明确指定的受支持单零件文件；一个文件也使用单元素批次。原生 CAD 的必要预处理仅用于制造分析，CLI 不提供派生 CAD 文件下载。
 
 用法：
   yoxiang analyze <file...> [options]
@@ -54,14 +53,6 @@ ${shared}`,
 同一命令中的显式毛坯应用于列出的每个文件；已知毛坯时应明确传入。DFM warning 不阻断工时分析。组件缺失时状态为 completed_with_gaps，并在 geometry/dfm/machining/preview 中单独标明。
 
 ${shared}`,
-  convert: `将一个或多个零件文件转换为 STEP AP214。STEP/STP 会在本地校验后直接复制；其他支持格式由 HOOPS Exchange 转换。
-
-用法：
-  yoxiang convert <file...> --output-dir <目录> [--json] [--api-base <url>]
-
-支持：.step、.stp、.x_t、.x_b、.sat、.sldprt、.prt、.ipt、.catpart。
-明确拒绝装配体和网格文件。输出为 <原文件名去扩展名>.step；发现输入重名或已有输出时，在发起网络任务前整体失败且绝不覆盖。
---json 使用 cli-convert-json-v1；下载令牌和对象存储地址不会写入输出。`,
   options: `查询公开材料、工艺、公差、粗糙度、文件限制和制造分析能力。
 
 用法：
@@ -112,7 +103,6 @@ function topicFromTokens(tokens: string[]): HelpTopic {
     if (tokens[1] === "status") return "status";
     return "analyze";
   }
-  if (tokens[0] === "convert") return "convert";
   if (tokens[0] === "cost-profile") return "costProfile";
   if (tokens[0] === "doctor") return "doctor";
   if (tokens[0] === "install") return "install";

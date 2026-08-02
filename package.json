@@ -1,7 +1,7 @@
 {
   "name": "@yoxiang/cli",
-  "version": "0.7.0",
-  "description": "Public CLI and agent skill for YoxiangAI CAD part manufacturing analysis and STEP conversion",
+  "version": "0.7.1",
+  "description": "Public CLI and agent skill for YoxiangAI CAD part manufacturing analysis",
   "type": "module",
   "bin": {
     "yoxiang": "dist/cli.js"
