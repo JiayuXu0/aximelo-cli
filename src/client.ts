@@ -1,11 +1,17 @@
 import { createHash, randomUUID } from "node:crypto";
-import { createReadStream } from "node:fs";
-import { open, realpath, stat } from "node:fs/promises";
-import { basename, extname } from "node:path";
+import { constants, createReadStream } from "node:fs";
+import { copyFile, mkdir, open, realpath, stat, unlink } from "node:fs/promises";
+import { basename, extname, join, parse } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import type {
   AnalysisBatchResult,
   AnalysisBatchUploadIntent,
   AnalysisOptions,
+  CadConversionBatch,
+  CadConversionBatchIntent,
+  CliConvertItem,
+  CliConvertResult,
   StockInput,
 } from "./types.js";
 
@@ -13,6 +19,10 @@ export const DEFAULT_API_BASE_URL = "https://quote-test-api.yoxiang.cn";
 export const DEFAULT_RESULT_BASE_URL = "https://test.yoxiang.cn";
 export const MAX_FILE_BYTES = 10_485_760;
 export const MAX_CONCURRENT_PARTS = 5;
+export const PASSTHROUGH_EXTENSIONS = [".step", ".stp"] as const;
+export const CONVERSION_EXTENSIONS = [".x_t", ".x_b", ".sat", ".sldprt", ".prt", ".ipt", ".catpart"] as const;
+export const REJECTED_EXTENSIONS = [".sldasm", ".asm", ".iam", ".catproduct", ".3dxml", ".stl", ".obj"] as const;
+export const SUPPORTED_EXTENSIONS = [...PASSTHROUGH_EXTENSIONS, ...CONVERSION_EXTENSIONS] as const;
 
 export const DEFAULT_ANALYSIS_INPUT = {
   material: "6061",
@@ -56,6 +66,11 @@ interface InspectedFile {
   sha256: string;
 }
 
+export interface ConvertFilesInput {
+  filePaths: string[];
+  outputDir: string;
+}
+
 export class AnalysisClient {
   private readonly baseUrl: string;
   private readonly resultBaseUrl: string;
@@ -85,7 +100,7 @@ export class AnalysisClient {
           file_name: file.name,
           file_size: file.size,
           checksum: `sha256:${file.sha256}`,
-          content_type: "model/step",
+          content_type: isStepExtension(extname(file.name)) ? "model/step" : "application/octet-stream",
           ...(normalized.stock ? { stock: normalized.stock } : {}),
         })),
         material: normalized.material,
@@ -107,6 +122,95 @@ export class AnalysisClient {
       { method: "POST" },
     );
     return this.decorateBatch(result);
+  }
+
+  async convertFiles(input: ConvertFilesInput): Promise<CliConvertResult> {
+    const files = await inspectFiles(input.filePaths);
+    const outputs = await conversionOutputs(files, input.outputDir);
+    const native = files.filter((file) => !isStepExtension(extname(file.name)));
+    const resultItems: CliConvertItem[] = [];
+
+    if (native.length > 0) {
+      const intent = await this.request<CadConversionBatchIntent>("/v1/public/cad-conversion-batches", {
+        method: "POST",
+        body: JSON.stringify({
+          files: native.map((file) => ({
+            file_name: file.name,
+            file_size: file.size,
+            checksum: `sha256:${file.sha256}`,
+            content_type: "application/octet-stream",
+          })),
+        }),
+        headers: jsonHeaders(),
+      });
+      if (!intent.download_token || intent.items.length !== native.length) {
+        throw new CliError("转换服务返回的批次凭据或上传地址无效。", 5);
+      }
+      await mapWithConcurrency(native, MAX_CONCURRENT_PARTS, async (file, index) => {
+        const item = intent.items[index]!;
+        await this.upload(file.path, item.upload_url, item.upload_method, item.required_headers);
+      });
+      let batch = await this.request<CadConversionBatch>(
+        `/v1/public/cad-conversion-batches/${encodeURIComponent(intent.batch_id)}/complete`,
+        { method: "POST" },
+      );
+      batch = await this.waitConversionBatch(intent.batch_id, batch);
+      for (const item of batch.items) {
+        if (item.status !== "succeeded") {
+          throw new CliError(`CAD_CONVERSION_FAILED：${item.file_name}（${item.error_code ?? "unknown"}）`, 5);
+        }
+        const source = native.find((file) => file.name === item.file_name);
+        if (!source) throw new CliError("转换服务返回了未知文件。", 5);
+        const destination = outputs.get(source.realPath)!;
+        await this.downloadStep(intent.batch_id, item.item_id, intent.download_token, destination);
+        resultItems.push(convertResultItem(source, destination, "hoops"));
+      }
+    }
+
+    for (const file of files.filter((candidate) => isStepExtension(extname(candidate.name)))) {
+      await validateStepHeader(file.path);
+      const destination = outputs.get(file.realPath)!;
+      await copyFile(file.path, destination, constants.COPYFILE_EXCL);
+      resultItems.push(convertResultItem(file, destination, "passthrough"));
+    }
+    resultItems.sort((left, right) => input.filePaths.indexOf(left.source_file) - input.filePaths.indexOf(right.source_file));
+    return { ok: true, format: "cli-convert-json-v1", status: "completed", items: resultItems };
+  }
+
+  private async waitConversionBatch(batchId: string, initial: CadConversionBatch): Promise<CadConversionBatch> {
+    let current = initial;
+    const deadline = Date.now() + 15 * 60_000;
+    while (!isConversionTerminal(current.status) && Date.now() < deadline) {
+      await delay(this.pollIntervalMs);
+      current = await this.request<CadConversionBatch>(`/v1/public/cad-conversion-batches/${encodeURIComponent(batchId)}`);
+    }
+    if (!isConversionTerminal(current.status)) throw new CliError("等待 CAD 转换超时。", 3);
+    return current;
+  }
+
+  private async downloadStep(batchId: string, itemId: string, token: string, outputPath: string): Promise<void> {
+    let response: Response;
+    try {
+      response = await this.fetchImpl(
+        `${this.baseUrl}/v1/public/cad-conversion-batches/${encodeURIComponent(batchId)}/items/${encodeURIComponent(itemId)}/step`,
+        { headers: { authorization: `Bearer ${token}` }, redirect: "follow" },
+      );
+    } catch (error) {
+      throw new CliError("无法下载转换后的 STEP 文件。", 5, error);
+    }
+    if (!response.ok || !response.body) throw new CliError(`STEP 下载失败（HTTP ${response.status}）。`, 5);
+    const handle = await open(outputPath, "wx");
+    try {
+      await pipeline(Readable.fromWeb(response.body as never), handle.createWriteStream());
+    } finally {
+      await handle.close().catch(() => undefined);
+    }
+    try {
+      await validateStepHeader(outputPath);
+    } catch (error) {
+      await unlink(outputPath).catch(() => undefined);
+      throw error;
+    }
   }
 
   async batchStatus(batchId: string): Promise<AnalysisBatchResult> {
@@ -173,8 +277,11 @@ export class AnalysisClient {
 
 export async function inspectFile(filePath: string): Promise<InspectedFile> {
   const extension = extname(filePath).toLowerCase();
-  if (extension !== ".step" && extension !== ".stp") {
-    throw new CliError("仅支持明确指定的 .step 或 .stp 文件路径。", 4);
+  if ((REJECTED_EXTENSIONS as readonly string[]).includes(extension)) {
+    throw new CliError(`不支持装配体或网格文件：${filePath}`, 4);
+  }
+  if (!(SUPPORTED_EXTENSIONS as readonly string[]).includes(extension)) {
+    throw new CliError(`不支持的零件格式：${filePath}`, 4);
   }
   let metadata;
   let resolvedPath;
@@ -184,9 +291,9 @@ export async function inspectFile(filePath: string): Promise<InspectedFile> {
     throw new CliError(`无法读取文件：${filePath}`, 4, error);
   }
   if (!metadata.isFile()) throw new CliError(`指定路径不是普通文件：${filePath}`, 4);
-  if (metadata.size <= 0) throw new CliError(`STEP 文件不能为空：${filePath}`, 4);
+  if (metadata.size <= 0) throw new CliError(`零件文件不能为空：${filePath}`, 4);
   if (metadata.size > MAX_FILE_BYTES) {
-    throw new CliError(`STEP 文件超过 10 MiB（10,485,760 bytes）：${filePath}`, 4);
+    throw new CliError(`零件文件超过 10 MiB（10,485,760 bytes）：${filePath}`, 4);
   }
 
   const hash = createHash("sha256");
@@ -206,7 +313,7 @@ export async function inspectFile(filePath: string): Promise<InspectedFile> {
 }
 
 export async function inspectFiles(filePaths: string[]): Promise<InspectedFile[]> {
-  if (filePaths.length === 0) throw new CliError("请至少明确指定一个 STEP/STP 文件。", 4);
+  if (filePaths.length === 0) throw new CliError("请至少明确指定一个零件文件。", 4);
   if (filePaths.length > MAX_CONCURRENT_PARTS) {
     throw new CliError(`一个批次最多同时分析 ${MAX_CONCURRENT_PARTS} 个零件，请分批顺序提交。`, 4);
   }
@@ -217,6 +324,61 @@ export async function inspectFiles(filePaths: string[]): Promise<InspectedFile[]
     seen.add(file.realPath);
   }
   return files;
+}
+
+async function conversionOutputs(files: InspectedFile[], outputDir: string): Promise<Map<string, string>> {
+  if (!outputDir.trim()) throw new CliError("convert 需要 --output-dir。", 4);
+  await mkdir(outputDir, { recursive: true });
+  const directory = await realpath(outputDir);
+  const outputs = new Map<string, string>();
+  const names = new Set<string>();
+  for (const file of files) {
+    const outputName = `${parse(file.name).name}.step`;
+    const collisionKey = outputName.toLowerCase();
+    if (names.has(collisionKey)) throw new CliError(`多个输入会生成同名文件：${outputName}`, 4);
+    names.add(collisionKey);
+    const outputPath = join(directory, outputName);
+    try {
+      await stat(outputPath);
+      throw new CliError(`输出文件已存在，拒绝覆盖：${outputPath}`, 4);
+    } catch (error) {
+      if (error instanceof CliError) throw error;
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw new CliError(`无法检查输出路径：${outputPath}`, 4, error);
+    }
+    outputs.set(file.realPath, outputPath);
+  }
+  return outputs;
+}
+
+async function validateStepHeader(filePath: string): Promise<void> {
+  const handle = await open(filePath, "r");
+  try {
+    const buffer = Buffer.alloc(4096);
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+    if (!buffer.subarray(0, bytesRead).toString("ascii").toUpperCase().includes("ISO-10303-21")) {
+      throw new CliError(`文件不是有效的 STEP 交换文件：${filePath}`, 4);
+    }
+  } finally {
+    await handle.close().catch(() => undefined);
+  }
+}
+
+function isStepExtension(extension: string): boolean {
+  return (PASSTHROUGH_EXTENSIONS as readonly string[]).includes(extension.toLowerCase());
+}
+
+function isConversionTerminal(status: CadConversionBatch["status"]): boolean {
+  return ["completed", "completed_with_errors", "failed", "expired"].includes(status);
+}
+
+function convertResultItem(file: InspectedFile, outputFile: string, conversion: "passthrough" | "hoops"): CliConvertItem {
+  return {
+    source_file: file.path,
+    output_file: outputFile,
+    source_format: extname(file.name).toLowerCase().slice(1),
+    conversion,
+    status: "succeeded",
+  };
 }
 
 export function isBatchTerminal(status: AnalysisBatchResult["status"]): boolean {

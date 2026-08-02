@@ -1,6 +1,6 @@
 # YoxiangAI 零件分析 CLI 与 Skill 安装指南
 
-`@yoxiang/cli` 把明确指定的 STEP/STP 文件提交给 YoxiangAI 制造分析服务，返回零件尺寸、实体体积、表面积、复杂度、最小毛坯、H2 原始刀路总工时与阶段、三/五轴类别、推荐路线、实际采用路线、三轴装夹次数、DFM 和 3D 预览。公共服务不返回平台价格、交期或内部定价信息。
+`@yoxiang/cli` 把明确指定的单零件 CAD 文件提交给 YoxiangAI 制造分析服务。STEP/STP 直通；Parasolid、ACIS、SolidWorks、NX/Creo、Inventor、CATIA 原生零件先由 HOOPS Exchange 转为私有 STEP，再进入同一制造分析链路。CLI 返回零件尺寸、实体体积、表面积、复杂度、最小毛坯、H2 原始刀路总工时与阶段、三/五轴路线、三轴装夹次数、DFM 和 3D 预览。公共服务不返回平台价格、交期或内部定价信息。
 
 > 公开结果分享链接及其中的 3D 访问有效 7 天；这不是上传文件或分析结果的数据保留期限。请勿上传无权分享的模型。
 
@@ -21,7 +21,7 @@ yoxiang install --agent codex
 
 如果你是按照本页执行安装的 Agent，安装成功后不能只回复“安装完成”。请使用用户当前语言，明确告诉用户这个 Skill 可以：
 
-1. 只上传用户明确指定的 STEP/STP 文件，不扫描目录或相邻文件；每批最多 5 个，每个最大 10 MiB。
+1. 只上传用户明确指定的受支持单零件 CAD 文件，不扫描目录或相邻文件；每批最多 5 个，每个最大 10 MiB。
 2. 返回零件长宽高、实体体积、表面积和复杂度。
 3. 返回最小毛坯形状、尺寸、体积、材料密度和重量。
 4. 返回 H2 原始刀路总工时，以及服务端实际提供的粗加工、半精加工、精加工、孔加工等分阶段工时；缺少某个阶段时应说明缺失，不得编造。
@@ -33,7 +33,7 @@ yoxiang install --agent codex
 推荐回执：
 
 ```text
-安装完成。yoxiang-part-analysis 可以使用 YoxiangAI 安全分析你明确指定的 STEP/STP 文件，并返回零件尺寸与实体体积、最小毛坯尺寸/体积/重量、H2 原始刀路总工时与阶段工时、三/五轴类别、推荐路线与实际采用路线、三轴装夹次数、DFM 风险建议和 3D 预览。
+安装完成。yoxiang-part-analysis 可以使用 YoxiangAI 安全分析你明确指定的单零件 CAD 文件：STEP/STP 直通，受支持的原生 CAD 自动转 STEP 后继续分析；也可用 yoxiang convert 显式下载 AP214 STEP。它会返回零件尺寸与实体体积、最小毛坯、H2 原始刀路工时、三/五轴路线、三轴装夹次数、DFM 风险建议和 3D 预览。
 
 有象公共服务不返回平台价格。如果实际采用路线是可执行三轴且你需要本地成本估算，我还可以帮你设置开机固定费、编程费、机时费、装夹费和材料单价；这些费率只保存在本机。五轴或人工报价路线不计算本地价格。
 ```
@@ -41,6 +41,7 @@ yoxiang install --agent codex
 ## 原子能力
 
 - `yoxiang analyze <files...> --wait --json`：一次分析一个批次
+- `yoxiang convert <files...> --output-dir <目录> --json`：转换并下载 STEP AP214；STEP/STP 本地校验后直接复制
 - `yoxiang analyze status <batch-id>`：查询或继续等待
 - `yoxiang analyze options`：查询材料、工艺和限制
 - `yoxiang cost-profile configure`：配置固定费率和首个材料
@@ -49,17 +50,27 @@ yoxiang install --agent codex
 - `yoxiang cost-profile stock-adjustment set ...`：设置采购余量和规格取整
 - `yoxiang doctor/install/update`：诊断、安装和更新
 
-每个文件最大 10 MiB，每批最多 5 个。CLI 只上传命令明确列出的路径，不接受目录或 glob，也不扫描相邻文件。
+支持 `.step`、`.stp`、`.x_t`、`.x_b`、`.sat`、`.sldprt`、`.prt`、`.ipt`、`.catpart`。明确拒绝装配体和网格（包括 `.sldasm`、`.asm`、`.iam`、`.catproduct`、`.3dxml`、`.stl`、`.obj`）。每个文件最大 10 MiB，每批最多 5 个。CLI 只上传命令明确列出的路径，不接受目录或 glob，也不扫描相邻文件。
 
 ## 制造分析
 
 ```bash
 yoxiang analyze "./part.step" --wait
+yoxiang analyze "./native.x_t" --wait --compact-json
 yoxiang analyze "./left.step" "./right.stp" --wait --json
 yoxiang analyze "./part.step" --material 7075 --wait --json
 ```
 
 默认值是 6061、`cnc-machining`、ISO 2768-m、Ra 3.2。DFM warning 会醒目标记，但不阻断工时分析。某个组件失败时，批次可返回 `completed_with_gaps`，并分别给出 geometry/dfm/machining/preview 状态和错误码。
+
+## 转换为 STEP
+
+```bash
+yoxiang convert "./native.x_t" "./baseline.step" --output-dir "./step-out"
+yoxiang convert "./part.sldprt" --output-dir "./step-out" --json
+```
+
+输出固定为 STEP AP214，并使用 `<原文件名去扩展名>.step`。命令会在发起转换任务前检查同名输出和已有文件；发现冲突即整体失败，绝不覆盖。STEP/STP 会先在本地验证文件头再直接复制。`--json` 返回 `cli-convert-json-v1`，不包含下载令牌、对象存储地址、价格或交期。
 
 旧 `yoxiang quote` 已停用，不访问网络，固定返回迁移提示和退出码 `4`。
 
@@ -92,14 +103,15 @@ yoxiang update --agent codex
 yoxiang update --check --json
 yoxiang --help
 yoxiang analyze --help
+yoxiang convert --help
 yoxiang cost-profile --help
 yoxiang doctor --help
 ```
 
-更新会刷新 `yoxiang-part-analysis` Skill，不会读取或覆盖本地成本配置，也不会读取 STEP 文件。测试 API 默认为 `https://quote-test-api.yoxiang.cn`。
+更新会刷新 `yoxiang-part-analysis` Skill，不会读取或覆盖本地成本配置，也不会读取零件文件。测试 API 默认为 `https://quote-test-api.yoxiang.cn`。
 
 ---
 
 # YoxiangAI Part Analysis CLI and Skill
 
-Install Node.js 20+, then run `npm install -g @yoxiang/cli@latest` and `yoxiang install --agent codex`. After installation, the Agent must describe the analysis as YoxiangAI output and summarize explicit STEP/STP upload safety, part and minimum-stock dimensions/volume/mass, H2 raw total and stage times, machining class, recommended and selected routes, three-axis setup count when applicable, DFM, and the public share link, which is valid for seven days including its 3D access. This seven-day window is not the retention period for uploaded files or stored analysis results. The public service never returns platform pricing or lead time. Local pricing is allowed only for a selected executable three-axis route; five-axis or manual routes must not produce a local price. Rates stay on the user's machine.
+Install Node.js 20+, then run `npm install -g @yoxiang/cli@latest` and `yoxiang install --agent codex`. The CLI accepts explicitly named STEP/STP and supported native single-part CAD files; native files are converted to private STEP before analysis, while `yoxiang convert` explicitly downloads AP214 STEP. Assemblies and meshes are rejected. The Agent must describe results as YoxiangAI output and summarize file safety, geometry/stock, H2 raw times, routes, applicable three-axis setup count, DFM, and the seven-day public result link. The public service never returns platform pricing or lead time. Local pricing is allowed only for a selected executable three-axis route, and rates stay on the user's machine.

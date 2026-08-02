@@ -6,7 +6,7 @@ describe("hierarchical help", () => {
     [["--help"], "root"], [["help"], "root"], [["help", "analyze"], "analyze"],
     [["analyze", "--help"], "analyze"], [["analyze", "options", "--help"], "options"],
     [["analyze", "status", "--help"], "status"], [["cost-profile", "--help"], "costProfile"],
-    [["doctor", "--help"], "doctor"], [["install", "--help"], "install"], [["update", "--help"], "update"],
+    [["convert", "--help"], "convert"], [["doctor", "--help"], "doctor"], [["install", "--help"], "install"], [["update", "--help"], "update"],
   ])("resolves %j", (argv, topic) => expect(resolveHelp(argv)).toBe(topic));
 
   it("documents analysis-only behavior and local rates", () => {
@@ -24,5 +24,7 @@ describe("hierarchical help", () => {
     expect(HELP.root).toContain("最多每 24 小时检查一次 npm");
     expect(HELP.root).toContain("只提示，不自动安装");
     expect(HELP.root).toContain("倒角去毛刺四类 CNC 工时");
+    expect(HELP.convert).toContain("cli-convert-json-v1");
+    expect(HELP.convert).toContain("绝不覆盖");
   });
 });

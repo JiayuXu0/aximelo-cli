@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -18,17 +18,21 @@ describe("explicit STEP file validation", () => {
     });
   });
 
-  it("rejects non-STEP files, directories, duplicates, and oversized files", async () => {
+  it("accepts native parts and rejects unsupported files, directories, duplicates, and oversized files", async () => {
     const directory = await mkdtemp(join(tmpdir(), "yoxiang-cli-paths-"));
     const file = join(directory, "part.step");
     const alias = join(directory, "alias.step");
     const folder = join(directory, "folder.step");
     const tooLarge = join(directory, "large.stp");
     await writeFile(file, "ISO-10303-21;");
+    const native = join(directory, "part.x_t");
+    await writeFile(native, "parasolid");
     await symlink(file, alias);
     await mkdir(folder);
     await writeFile(tooLarge, Buffer.alloc(MAX_FILE_BYTES + 1));
     await expect(inspectFile("part.txt")).rejects.toMatchObject({ exitCode: 4 });
+    await expect(inspectFile("assembly.sldasm")).rejects.toMatchObject({ exitCode: 4 });
+    await expect(inspectFile(native)).resolves.toMatchObject({ name: "part.x_t" });
     await expect(inspectFile(folder)).rejects.toMatchObject({ exitCode: 4 });
     await expect(inspectFiles([file, alias])).rejects.toMatchObject({ exitCode: 4 });
     await expect(inspectFile(tooLarge)).rejects.toMatchObject({ exitCode: 4 });
@@ -47,6 +51,74 @@ describe("explicit STEP file validation", () => {
 });
 
 describe("AnalysisClient", () => {
+  it("preflights output collisions before creating a conversion task", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "yoxiang-convert-collision-"));
+    const output = join(directory, "out");
+    const first = join(directory, "part.x_t");
+    const second = join(directory, "part.sat");
+    await writeFile(first, "parasolid");
+    await writeFile(second, "acis");
+    const fetchImpl = vi.fn<typeof fetch>();
+    const client = new AnalysisClient({ baseUrl: "https://api.example.test", fetchImpl });
+    await expect(client.convertFiles({ filePaths: [first, second], outputDir: output })).rejects.toMatchObject({ exitCode: 4 });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("converts native CAD and locally copies STEP in one batch without exposing the token", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "yoxiang-convert-mixed-"));
+    const output = join(directory, "out");
+    const native = join(directory, "native.x_t");
+    const step = join(directory, "baseline.stp");
+    await writeFile(native, "parasolid");
+    await writeFile(step, "ISO-10303-21;baseline");
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({
+        batch_id: "c1", status: "awaiting_upload", download_token: "secret-download-token",
+        items: [{ item_id: "i1", file_name: "native.x_t", status: "awaiting_upload", upload_url: "https://upload.example.test/native", upload_method: "PUT" }],
+        expires_at: "2026-08-02T02:00:00Z",
+      }, 201))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(jsonResponse({
+        batch_id: "c1", status: "completed", expires_at: "2026-08-02T02:00:00Z",
+        items: [{ item_id: "i1", file_name: "native.x_t", source_format: "x_t", status: "succeeded" }],
+      }, 202))
+      .mockResolvedValueOnce(new Response("ISO-10303-21;converted", { status: 200 }));
+    const result = await new AnalysisClient({ baseUrl: "https://api.example.test", fetchImpl }).convertFiles({
+      filePaths: [native, step], outputDir: output,
+    });
+    expect(result).toMatchObject({ format: "cli-convert-json-v1", status: "completed", items: [{ conversion: "hoops" }, { conversion: "passthrough" }] });
+    expect(JSON.stringify(result)).not.toContain("secret-download-token");
+    expect(await readFile(join(output, "native.step"), "utf8")).toContain("ISO-10303-21");
+    expect(await readFile(join(output, "baseline.step"), "utf8")).toContain("baseline");
+    expect(fetchImpl.mock.calls[3]?.[1]?.headers).toEqual({ authorization: "Bearer secret-download-token" });
+  });
+
+  it("removes an invalid downloaded STEP instead of leaving a corrupt output", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "yoxiang-convert-invalid-step-"));
+    const output = join(directory, "out");
+    const native = join(directory, "native.sat");
+    await writeFile(native, "acis");
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({
+        batch_id: "c2", status: "awaiting_upload", download_token: "download-token",
+        items: [{ item_id: "i2", file_name: "native.sat", status: "awaiting_upload", upload_url: "https://upload.example.test/native", upload_method: "PUT" }],
+        expires_at: "2026-08-02T02:00:00Z",
+      }, 201))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(jsonResponse({
+        batch_id: "c2", status: "completed", expires_at: "2026-08-02T02:00:00Z",
+        items: [{ item_id: "i2", file_name: "native.sat", source_format: "sat", status: "succeeded" }],
+      }, 202))
+      .mockResolvedValueOnce(new Response("not a STEP file", { status: 200 }));
+
+    await expect(new AnalysisClient({ baseUrl: "https://api.example.test", fetchImpl }).convertFiles({
+      filePaths: [native], outputDir: output,
+    })).rejects.toMatchObject({ exitCode: 4 });
+    await expect(access(join(output, "native.step"))).rejects.toBeDefined();
+  });
+
   it("creates one batch, uploads explicit files, and completes the analysis contract", async () => {
     const directory = await mkdtemp(join(tmpdir(), "yoxiang-analysis-submit-"));
     const first = join(directory, "first.step");
