@@ -1,7 +1,7 @@
 {
   "name": "@aximelo/cli",
-  "version": "1.0.0",
-  "description": "Public CLI and agent skill for Aximelo CAD part manufacturing analysis",
+  "version": "1.0.1",
+  "description": "Manufacturing analysis CLI and Agent Skill for CAD geometry, stock, routes, setups, H2 time, DFM, 3D preview, and private local costing",
   "type": "module",
   "bin": {
     "aximelo": "dist/cli.js"
@@ -36,6 +36,19 @@
   "bugs": {
     "url": "https://github.com/JiayuXu0/aximelo-cli/issues"
   },
+  "keywords": [
+    "aximelo",
+    "cad",
+    "cnc",
+    "manufacturing",
+    "dfm",
+    "cam",
+    "step",
+    "machining",
+    "agent-skill",
+    "codex",
+    "claude-code"
+  ],
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.15.3",
