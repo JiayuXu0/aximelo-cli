@@ -82,8 +82,9 @@ Treat setup count only as a machining-route fact. `SETUP_COUNT_EXCESSIVE` is not
 Keep the stock meanings separate:
 
 - `geometry.minimum_stock` is the geometry-derived minimum envelope.
-- `machining.stock` is the blank actually used by AutoCam. Show `source`, `input_size_mm`, `resolved_size_mm`, `axis`, and `envelope_contains_part`.
-- For a provided block, preserve `input_size_mm` order and use `resolved_size_mm` to explain the selected X/Y/Z permutation. Do not reorder the user's declared value in the request.
+- `geometry.bounding_box_xyz_mm` is the part's global X/Y/Z bounding box. `shop_dimensions_mm` always means length/width/thickness and must be labelled separately.
+- `machining.stock` is the blank actually used by AutoCam. Show `derivation_mode`, `input_size_mm`, `resolved_size_mm`, `frame`, `shop_dimensions_mm`, and `envelope_contains_part` when present.
+- For a provided block, preserve `input_size_mm` order and use `resolved_size_mm` only as the blank's local X/Y/Z order when `frame` is present. Do not reorder the user's declared value in the request. For legacy results without `frame`, label the resolved values as dimensions with direction unavailable rather than global X/Y/Z.
 
 Treat `machining.total_processing_minutes`, every `machining.stages[].minutes` value, and every `machining.cnc_breakdown_minutes` value as H2 raw toolpath time. `machining.cnc_breakdown_minutes` is an alternative classification of the same total: semi-finishing belongs to roughing, threading belongs to holemaking, and deburring includes only geometrically evidenced edge breaks and hole-mouth chamfers. Its four values sum to `total_processing_minutes`; never add them to `stages`. If the field is absent in a legacy result, say the detailed CNC breakdown is unavailable rather than inventing it. Use `machining.route` as the route authority:
 

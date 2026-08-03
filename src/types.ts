@@ -26,11 +26,28 @@ export type StockInput =
   | { shape: "block"; size_mm: [number, number, number] }
   | { shape: "cylinder"; diameter_mm: number; length_mm: number };
 
+export interface ShopDimensionsMm {
+  length: number;
+  width: number;
+  thickness: number;
+}
+
+export interface StockFrame {
+  oriented: boolean;
+  origin_mm: [number, number, number];
+  x_axis: [number, number, number];
+  y_axis: [number, number, number];
+  z_axis: [number, number, number];
+}
+
 export interface MachiningStock {
   shape: "block" | "cylinder" | "profile";
   source: "provided" | "derived";
+  derivation_mode?: "provided" | "generic_allowance" | "plate_inference";
   input_size_mm: [number, number, number];
   resolved_size_mm: [number, number, number];
+  frame?: StockFrame;
+  shop_dimensions_mm?: ShopDimensionsMm;
   axis: [number, number, number];
   diameter_mm?: number;
   length_mm?: number;
@@ -133,6 +150,7 @@ export interface MachiningTime {
 export interface MinimumStock {
   shape: "block" | "cylinder";
   dimensions_mm: Record<string, number>;
+  shop_dimensions_mm?: ShopDimensionsMm;
   volume_cm3: number;
   material_density_kg_m3: number;
   mass_kg: number;
@@ -142,6 +160,8 @@ export interface AnalysisGeometry {
   length_mm: number;
   width_mm: number;
   height_mm: number;
+  bounding_box_xyz_mm?: [number, number, number];
+  shop_dimensions_mm?: ShopDimensionsMm;
   volume_cm3: number;
   surface_area_cm2: number;
   complexity_score: number;

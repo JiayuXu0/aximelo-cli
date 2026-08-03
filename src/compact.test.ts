@@ -154,6 +154,10 @@ describe("compact agent analysis output", () => {
     expect(converted.items[0]?.machining).toMatchObject({
       total_processing_minutes: 90,
       cnc_breakdown_minutes: { deburring: 6 },
+      stock: {
+        derivation_mode: "generic_allowance",
+        shop_dimensions_mm: { length: 110, width: 90, thickness: 20 },
+      },
     });
     expect(converted.items[0]?.machining?.stages[0]).toEqual({ code: "stage-0", minutes: 6 });
     const serialized = JSON.stringify(converted.items[0]?.machining);
@@ -182,6 +186,8 @@ function part(index: number): AnalysisResult {
       length_mm: 100,
       width_mm: 80,
       height_mm: 20,
+      bounding_box_xyz_mm: [100, 80, 20],
+      shop_dimensions_mm: { length: 100, width: 80, thickness: 20 },
       volume_cm3: 120,
       surface_area_cm2: 400,
       complexity_score: 0.5,
@@ -189,6 +195,7 @@ function part(index: number): AnalysisResult {
       minimum_stock: {
         shape: "block",
         dimensions_mm: { length: 106, width: 86, height: 26 },
+        shop_dimensions_mm: { length: 106, width: 86, thickness: 26 },
         volume_cm3: 237,
         material_density_kg_m3: 2700,
         mass_kg: 0.64,
@@ -220,6 +227,27 @@ function part(index: number): AnalysisResult {
         recommended_route: route(),
         selected_route: route(),
       },
+      ...(index === 1 ? {
+        stock: {
+          shape: "block" as const,
+          source: "derived" as const,
+          derivation_mode: "generic_allowance" as const,
+          input_size_mm: [20, 110, 90] as [number, number, number],
+          resolved_size_mm: [20, 110, 90] as [number, number, number],
+          frame: {
+            oriented: true,
+            origin_mm: [0, 0, 0] as [number, number, number],
+            x_axis: [1, 0, 0] as [number, number, number],
+            y_axis: [0, 1, 0] as [number, number, number],
+            z_axis: [0, 0, 1] as [number, number, number],
+          },
+          shop_dimensions_mm: { length: 110, width: 90, thickness: 20 },
+          axis: [1, 0, 0] as [number, number, number],
+          envelope_contains_part: true,
+          volume_cm3: 198,
+          mass_kg: 0.5346,
+        },
+      } : {}),
     },
     dfm: {
       risk_level: "medium",

@@ -73,8 +73,8 @@ For Claude Code, replace `codex` with `claude`. Use `--agent all` only when you 
 
 | Manufacturing question | Returned evidence | Learn more |
 | --- | --- | --- |
-| What is this part? | Bounding-box dimensions, solid volume, surface area, complexity, and source format | [Dimensions and related information](https://www.aximelo.ai/en/drawing-dimensions/) |
-| What stock is needed? | Geometry-derived minimum stock and the separate actual machining blank, including resolved orientation, volume, mass, and containment | [Quote pre-check](https://www.aximelo.ai/en/quote-precheck/) |
+| What is this part? | Explicit global X/Y/Z bounding-box dimensions, shop length/width/thickness, solid volume, surface area, complexity, and source format | [Dimensions and related information](https://www.aximelo.ai/en/drawing-dimensions/) |
+| What stock is needed? | Geometry-derived minimum stock and the separate actual machining blank, including its source, local frame, shop length/width/thickness, volume, mass, and containment | [Quote pre-check](https://www.aximelo.ai/en/quote-precheck/) |
 | Three-axis or five-axis? | Machining class, recommended route, selected route, time basis, executability, and manual-review reasons | [Route and tool access](https://www.aximelo.ai/en/toolpath-generation/) |
 | How many setups? | Setup count, confidence, and validation status when the selected route is an executable three-axis route | [Setup-count analysis](https://www.aximelo.ai/en/setup-count/) |
 | How long will machining take? | H2 raw toolpath total, returned planner stages, and holemaking/roughing/finishing/deburring views | [Machining time](https://www.aximelo.ai/en/machining-time/) |

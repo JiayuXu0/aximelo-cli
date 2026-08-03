@@ -461,16 +461,29 @@ function formatPart(item: AnalysisResult): string[] {
   const lines = [`${item.file_name}（${item.status}）`];
   if (item.source_format) lines.push(`- 源格式：${item.source_format}`);
   if (item.geometry) {
-    lines.push(`- 零件尺寸：${item.geometry.length_mm} × ${item.geometry.width_mm} × ${item.geometry.height_mm} mm`);
+    const boundingBox = item.geometry.bounding_box_xyz_mm ?? [item.geometry.length_mm, item.geometry.width_mm, item.geometry.height_mm];
+    lines.push(`- 零件包围盒（全局 X/Y/Z）：${boundingBox.join(" × ")} mm`);
+    if (item.geometry.shop_dimensions_mm) lines.push(`- 零件车间尺寸（长×宽×厚）：${formatShopDimensions(item.geometry.shop_dimensions_mm)} mm`);
     lines.push(`- 实体体积：${item.geometry.volume_cm3} cm³；表面积：${item.geometry.surface_area_cm2} cm²；复杂度：${item.geometry.complexity_level} (${item.geometry.complexity_score})`);
     const stock = item.geometry.minimum_stock;
-    if (stock) lines.push(`- 最小毛坯：${stock.shape}，${Object.entries(stock.dimensions_mm).map(([key, value]) => `${key}=${value} mm`).join("，")}；${stock.volume_cm3} cm³ / ${stock.mass_kg} kg`);
+    if (stock) {
+      const dimensions = stock.shop_dimensions_mm
+        ? `长×宽×厚 ${formatShopDimensions(stock.shop_dimensions_mm)} mm`
+        : Object.entries(stock.dimensions_mm).map(([key, value]) => `${key}=${value} mm`).join("，");
+      lines.push(`- 几何最小毛坯：${stock.shape}，${dimensions}；${stock.volume_cm3} cm³ / ${stock.mass_kg} kg`);
+    }
   }
   if (item.machining) {
     const route = item.machining.route;
     const machiningStock = item.machining.stock;
     if (machiningStock) {
-      lines.push(`- 实际加工毛坯：${machiningStock.shape}（${machiningStock.source}）；输入 ${machiningStock.input_size_mm.join(" × ")} mm；解析 ${machiningStock.resolved_size_mm.join(" × ")} mm；轴向 [${machiningStock.axis.join(", ")}]；包络${machiningStock.envelope_contains_part ? "通过" : "失败"}`);
+      lines.push(`- 加工毛坯来源：${stockDerivationLabel(machiningStock.derivation_mode, machiningStock.source)}`);
+      if (machiningStock.shop_dimensions_mm) lines.push(`- 加工毛坯（长×宽×厚）：${formatShopDimensions(machiningStock.shop_dimensions_mm)} mm`);
+      lines.push(`- 毛坯输入三边（原始顺序）：${machiningStock.input_size_mm.join(" × ")} mm`);
+      lines.push(`- ${machiningStock.frame ? "毛坯局部 X/Y/Z" : "解析三边（方向未提供）"}：${machiningStock.resolved_size_mm.join(" × ")} mm`);
+      if (machiningStock.shape === "cylinder") lines.push(`- 毛坯轴向：[${machiningStock.axis.join(", ")}]`);
+      else if (machiningStock.frame) lines.push(`- 毛坯坐标系：原点 [${machiningStock.frame.origin_mm.join(", ")}]；局部轴方向已提供`);
+      lines.push(`- 毛坯包络：${machiningStock.envelope_contains_part ? "通过" : "失败"}；${machiningStock.volume_cm3} cm³ / ${machiningStock.mass_kg} kg`);
     }
     lines.push(`- H2 原始刀路总工时：${formatHoursAsMinutes(item.machining.total_processing)} 分钟；估算等级：${item.machining.estimate_grade ?? "未知"}`);
     const cnc = item.machining.cnc_breakdown_minutes;
@@ -503,6 +516,15 @@ function formatPart(item: AnalysisResult): string[] {
   if (findings.length) lines.push("- DFM 风险：", ...findings.map((finding) => `  - ${finding}`));
   for (const [name, component] of Object.entries(item.components)) if (component.status === "failed" || component.status === "unavailable") lines.push(`- ${name}：${component.status}${component.error_code ? ` (${component.error_code})` : ""}`);
   return lines;
+}
+
+function formatShopDimensions(dimensions: { length: number; width: number; thickness: number }): string {
+  return `${dimensions.length} × ${dimensions.width} × ${dimensions.thickness}`;
+}
+
+function stockDerivationLabel(mode: string | undefined, source: string): string {
+  return ({ provided: "用户指定", generic_allowance: "通用余量", plate_inference: "薄板自动推导" } as Record<string, string>)[mode ?? ""]
+    ?? (source === "provided" ? "用户指定" : "几何推导（旧结果未提供推导模式）");
 }
 
 function routeLabel(value: string | undefined): string {

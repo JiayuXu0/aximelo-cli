@@ -72,8 +72,8 @@ aximelo doctor --json
 
 | 制造问题 | 返回的依据 | 详细说明 |
 | --- | --- | --- |
-| 这是一个什么零件？ | 包围盒尺寸、实体体积、表面积、复杂度和源文件格式 | [图纸尺寸与相关信息](https://www.aximelo.ai/zh-cn/drawing-dimensions/) |
-| 应该选什么毛坯？ | 几何最小毛坯，以及单独展示的实际加工毛坯、解析方向、体积、重量和包络检查 | [报价前置分析](https://www.aximelo.ai/zh-cn/quote-precheck/) |
+| 这是一个什么零件？ | 明确标注的全局 X/Y/Z 包围盒、车间长×宽×厚、实体体积、表面积、复杂度和源文件格式 | [图纸尺寸与相关信息](https://www.aximelo.ai/zh-cn/drawing-dimensions/) |
+| 应该选什么毛坯？ | 几何最小毛坯，以及单独展示的实际加工毛坯来源、局部坐标、车间长×宽×厚、体积、重量和包络检查 | [报价前置分析](https://www.aximelo.ai/zh-cn/quote-precheck/) |
 | 应该走三轴还是五轴？ | 加工类别、推荐路线、实际采用路线、时间口径、刀路是否可执行和人工复核原因 | [路线与刀具可达性](https://www.aximelo.ai/zh-cn/toolpath-generation/) |
 | 实际需要几次装夹？ | 实际采用路线为可执行三轴时的装夹次数、置信度和验证状态 | [装夹次数判断](https://www.aximelo.ai/zh-cn/setup-count/) |
 | 加工需要多长时间？ | H2 原始刀路总工时、实际返回的规划阶段，以及孔加工、粗加工、精加工和去毛刺分类 | [加工时间](https://www.aximelo.ai/zh-cn/machining-time/) |
