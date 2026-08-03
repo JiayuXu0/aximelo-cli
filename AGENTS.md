@@ -21,4 +21,4 @@ Do not add legacy product names, legacy commands, legacy environment variables, 
 
 ## Change and release gates
 
-Run `npm run verify`, validate `skills/aximelo/SKILL.md` with the Codex skill validator, and inspect `npm pack --dry-run` before publishing. Update `README.md`, `docs/installation.md`, exported static docs, tests, and the Skill together whenever public behavior changes.
+Run `npm run verify`, validate `skills/aximelo/SKILL.md` with the Codex skill validator, and inspect `npm pack --dry-run` before publishing. Keep `README.md` and `README.zh-CN.md` structurally aligned. Update both READMEs, `docs/installation.md`, exported static docs, tests, and the Skill together whenever public behavior changes.

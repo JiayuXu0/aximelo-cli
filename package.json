@@ -10,6 +10,8 @@
     "dist",
     "skills",
     "README.md",
+    "README.zh-CN.md",
+    "docs/assets",
     "LICENSE"
   ],
   "scripts": {
@@ -29,6 +31,10 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/JiayuXu0/aximelo-cli.git"
+  },
+  "homepage": "https://www.aximelo.ai/",
+  "bugs": {
+    "url": "https://github.com/JiayuXu0/aximelo-cli/issues"
   },
   "license": "MIT",
   "devDependencies": {
