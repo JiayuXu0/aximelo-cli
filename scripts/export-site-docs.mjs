@@ -5,10 +5,13 @@ import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const frontendRoot = resolve(process.argv[2] ?? join(repositoryRoot, "..", "poieza-quote-frontend"));
-const outputRoot = join(frontendRoot, "apps", "web", "public", "open", "aximelo-cli");
+const websiteRoot = resolve(process.argv[2] ?? join(repositoryRoot, "..", "AximeloSkillWeb"));
+const outputRoot = join(websiteRoot, "public", "open", "aximelo-cli");
 const installationSource = join(repositoryRoot, "docs", "installation.md");
 const skillSource = join(repositoryRoot, "skills", "aximelo", "SKILL.md");
+
+const packageJson = JSON.parse(await readFile(join(repositoryRoot, "package.json"), "utf8"));
+const sourceCommit = getSourceCommit(repositoryRoot);
 const installationTarget = join(outputRoot, "installation.md");
 const skillTarget = join(outputRoot, "skills", "aximelo", "SKILL.md");
 
@@ -16,13 +19,21 @@ await mkdir(dirname(skillTarget), { recursive: true });
 await cp(installationSource, installationTarget);
 await cp(skillSource, skillTarget);
 
-const packageJson = JSON.parse(await readFile(join(repositoryRoot, "package.json"), "utf8"));
-const sourceCommit = getSourceCommit(repositoryRoot);
 const manifest = {
+  product: "Aximelo",
   cli: {
     package: packageJson.name,
     version: packageJson.version,
     dist_tag: "latest",
+  },
+  skill: {
+    name: "aximelo",
+    path: "skills/aximelo/SKILL.md",
+  },
+  endpoints: {
+    website: "https://www.aximelo.ai",
+    analysis: "https://api.aximelo.ai",
+    results: "https://app.aximelo.ai",
   },
   source: {
     repository: "https://github.com/JiayuXu0/aximelo-cli",
@@ -34,7 +45,7 @@ const manifest = {
   },
 };
 await writeFile(join(outputRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-process.stdout.write(`Exported part analysis CLI docs to ${outputRoot}\n`);
+process.stdout.write(`Exported Aximelo CLI docs to ${outputRoot}\n`);
 
 async function sha256(path) {
   return createHash("sha256").update(await readFile(path)).digest("hex");

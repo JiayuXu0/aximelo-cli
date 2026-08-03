@@ -1,108 +1,219 @@
-# Aximelo 零件分析 CLI 与 Skill 安装指南
+# Aximelo 制造分析 Skill 安装说明
 
-`@aximelo/cli` 把明确指定的单零件 CAD 文件提交给 Aximelo 制造分析服务。CLI 接受 STEP/STP 和受支持原生单零件作为分析输入，返回零件尺寸、实体体积、表面积、复杂度、最小毛坯、H2 原始刀路总工时与阶段、三/五轴路线、三轴装夹次数、DFM 和 3D 预览。原生 CAD 的必要预处理只用于内部制造分析，公共 CLI/Skill 不提供格式转换或派生 CAD 文件下载；公共服务不返回平台价格、交期或内部定价信息。
+Aximelo 是安装在 Codex、Claude Code 等 Agent 里的制造分析 Skill。安装后，用户只需要选中一个 CAD 单零件文件并用自然语言提问，Agent 会调用 Aximelo，整理零件几何、毛坯、加工路线、装夹、H2 工时、DFM 和 3D 预览。
 
-> 公开结果分享链接及其中的 3D 访问有效 7 天；这不是上传文件或分析结果的数据保留期限。请勿上传无权分享的模型。
+> 如果你是收到本页地址的 Agent：请直接完成下面的安装和检查，不要让用户手工输入命令。安装完成后，用用户当前语言说明已经装好、能做什么，以及如何开始第一次分析。
 
-## 安装
+## 一分钟安装
 
-需要 Node.js 20 或更高版本：
+要求：Node.js 20 或更高版本。
+
+在 Codex 中安装：
 
 ```bash
 npm install -g @aximelo/cli@latest
-aximelo install --agent codex
+aximelo install --agent codex --json
+aximelo doctor --json
 ```
 
-首次交互安装会展示全部原子能力，并依次询问开机固定费、编程费、机时费、装夹费和 6061 材料单价。费率仅保存在本机，绝不会上传。Claude Code 使用 `--agent claude`，两者都安装使用 `--agent all`。
-
-非交互或 `--json` 安装不会卡在输入，结果会标记 `cost_profile: missing`；Agent 第一次需要算价时再询问并保存。
-
-## 给 Agent 的安装完成回执要求
-
-如果你是按照本页执行安装的 Agent，安装成功后不能只回复“安装完成”。请使用用户当前语言，明确告诉用户这个 Skill 可以：
-
-1. 只上传用户明确指定的受支持单零件 CAD 文件，不扫描目录或相邻文件；每批最多 5 个，每个最大 10 MiB。
-2. 返回零件长宽高、实体体积、表面积和复杂度。
-3. 返回最小毛坯形状、尺寸、体积、材料密度和重量。
-4. 返回 H2 原始刀路总工时，以及服务端实际提供的粗加工、半精加工、精加工、孔加工等分阶段工时；缺少某个阶段时应说明缺失，不得编造。
-5. 返回三/五轴类别、H2 推荐路线、实际采用路线、时间口径；仅三轴可执行路线显示装夹次数，五轴/人工报价路线不得编造装夹次数或价格。
-6. 返回估算等级、结构化 DFM 风险与建议，以及 3D 预览和缩略图链接。
-
-安装完成后还要提醒用户：公共服务不返回价格或交期。如果用户需要本地成本估算，可以继续配置开机固定费、编程费、机时费、装夹费和材料单价；费率只保存在用户本机。用户没有要求估价时，只做一次可选提醒，不要阻塞追问费率。
-
-推荐回执：
-
-```text
-安装完成。aximelo 可以使用 Aximelo 安全分析你明确指定的 STEP/STP 或受支持原生单零件 CAD 文件。原生 CAD 的必要预处理只在内部分析链路中执行，不提供派生文件下载。它会返回零件尺寸与实体体积、最小毛坯、H2 原始刀路工时、三/五轴路线、三轴装夹次数、DFM 风险建议和 3D 预览。
-
-Aximelo 公共服务不返回平台价格。如果实际采用路线是可执行三轴且你需要本地成本估算，我还可以帮你设置开机固定费、编程费、机时费、装夹费和材料单价；这些费率只保存在本机。五轴或人工报价路线不计算本地价格。
-```
-
-## 原子能力
-
-- `aximelo analyze <files...> --wait --json`：一次分析一个批次
-- `aximelo analyze status <batch-id>`：查询或继续等待
-- `aximelo analyze options`：查询材料、工艺和限制
-- `aximelo cost-profile configure`：配置固定费率和首个材料
-- `aximelo cost-profile show --json`：读取本地配置
-- `aximelo cost-profile material set ...`：补充材料单价
-- `aximelo cost-profile stock-adjustment set ...`：设置采购余量和规格取整
-- `aximelo doctor/install/update`：诊断、安装和更新
-
-支持 `.step`、`.stp`、`.x_t`、`.x_b`、`.sat`、`.sldprt`、`.prt`、`.ipt`、`.catpart`。明确拒绝装配体和网格（包括 `.sldasm`、`.asm`、`.iam`、`.catproduct`、`.3dxml`、`.stl`、`.obj`）。每个文件最大 10 MiB，每批最多 5 个。CLI 只上传命令明确列出的路径，不接受目录或 glob，也不扫描相邻文件。
-
-## 制造分析
+在 Claude Code 中安装：
 
 ```bash
-aximelo analyze "./part.step" --wait
-aximelo analyze "./native.x_t" --wait --compact-json
-aximelo analyze "./left.step" "./right.stp" --wait --json
-aximelo analyze "./part.step" --material 7075 --wait --json
+npm install -g @aximelo/cli@latest
+aximelo install --agent claude --json
+aximelo doctor --json
 ```
 
-默认值是 6061、`cnc-machining`、ISO 2768-m、Ra 3.2。DFM warning 会醒目标记，但不阻断工时分析。某个组件失败时，批次可返回 `completed_with_gaps`，并分别给出 geometry/dfm/machining/preview 状态和错误码。
+只有用户明确要求同时安装到两者时，才使用：
 
-受支持原生单零件的必要输入处理属于内部制造分析步骤。CLI/Skill 不提供独立格式转换命令，不返回或下载内部派生 CAD 文件，也不展示内部转换器或存储地址。
+```bash
+aximelo install --agent all --json
+```
 
-旧 `aximelo quote` 已停用，不访问网络，固定返回迁移提示和退出码 `4`。
+`doctor` 只检查 Aximelo 服务和当前能力，不读取或上传零件文件。安装成功后，不要为了演示而搜索用户目录，也不要擅自挑选文件上传。
 
-## 本地成本配置
+## 安装完成后怎么使用
 
-POSIX 保存于 `${XDG_CONFIG_HOME:-~/.config}/aximelo/cost-profile.json`，权限 `0600`；Windows 保存于 `%APPDATA%\\aximelo\\cost-profile.json`。
+用户不需要记命令。让用户明确选中一个或多个零件文件，然后直接提问，例如：
+
+- “分析这个零件，告诉我能不能加工、建议三轴还是五轴、需要几次装夹。”
+- “这个零件有哪些 DFM 风险？请按严重程度说明位置、原因和修改建议。”
+- “给我看尺寸、实体体积、最小毛坯和实际加工毛坯。”
+- “H2 总工时是多少？把粗加工、精加工、孔加工和倒角去毛刺分开说明。”
+- “我知道方料是 20 × 868 × 175 mm，请按这个毛坯重新分析。”
+- “按数量 20 件计算本地成本；缺少费率时一次问完我需要提供的参数。”
+
+Agent 正常分析时使用有界摘要，避免完整 JSON 占满上下文：
+
+```bash
+aximelo analyze "/absolute/path/part.step" --wait --compact-json
+```
+
+一次可以分析最多 5 个用户明确指定的文件：
+
+```bash
+aximelo analyze "/absolute/path/a.step" "/absolute/path/b.x_t" --wait --compact-json
+```
+
+已知方料或圆料时，应显式传入，不要用最小毛坯替代用户给出的真实毛坯：
+
+```bash
+aximelo analyze "/absolute/path/part.step" --stock-box 20 868 175 --wait --compact-json
+aximelo analyze "/absolute/path/round.step" --stock-cylinder 60 25 --wait --compact-json
+```
+
+同一条命令里的毛坯参数会应用到该命令列出的所有文件。不同零件使用不同毛坯时，应分开分析。
+
+## 当前支持的文件
+
+支持以下单零件 CAD 文件：
+
+```text
+.step  .stp  .x_t  .x_b  .sat  .sldprt  .prt  .ipt  .catpart
+```
+
+- 每个文件最大 10 MiB；每批最多 5 个文件。
+- 只上传用户明确指定的精确路径；不接受目录或 glob，不扫描相邻文件。
+- 拒绝装配体和网格，包括 `.sldasm`、`.asm`、`.iam`、`.catproduct`、`.3dxml`、`.stl` 和 `.obj`。
+- 原生 CAD 的必要预处理只用于内部制造分析。公共 Skill 不提供独立格式转换，也不下载派生 CAD 文件。
+- 不要上传用户无权分享的模型。公开结果链接及其中的 3D 访问有效 7 天；这不代表上传文件或分析结果的数据保留期限。
+
+## Aximelo 会返回什么
+
+### 1. 几何与毛坯
+
+- 零件长、宽、高；
+- 实体体积、表面积、复杂度；
+- 几何最小毛坯的形状、尺寸、体积、密度和重量；
+- 实际加工毛坯的来源、用户输入尺寸、解析后的方向、体积、重量和包络检查。
+
+最小毛坯和实际加工毛坯是两件事，回答时必须分开说明。
+
+### 2. 加工路线与装夹
+
+- 三轴或五轴加工类别；
+- H2 推荐路线和实际采用路线；
+- 路线是否已有可执行刀路；
+- 时间口径和需要人工报价的原因；
+- 实际采用路线为可执行三轴时，返回机器学习装夹次数、置信度和验证状态。
+
+五轴路线、人工报价路线或没有可执行三轴证明时，不得编造装夹次数或价格。
+
+### 3. H2 加工工时
+
+- H2 原始刀路总工时；
+- 服务实际返回的阶段工时（规划最多六阶段）；
+- 孔加工、粗加工、精加工、倒角去毛刺四类 CNC 工时。
+
+四类 CNC 工时是同一总工时的分类视图，不是额外工时。不要把它们再与 H2 总工时或阶段工时相加。缺少某个阶段或分类时，应明确说“未返回”，不能补造数据。
+
+### 4. DFM 与 3D
+
+- 结构化 DFM 风险等级、位置、说明和建议；
+- 与风险关联的 3D 节点；
+- 3D 预览和缩略图状态及链接。
+
+DFM warning 不会自动阻断工时分析，但回答时应醒目标出。
+
+## 怎么读取部分成功结果
+
+一个批次可能返回 `completed_with_gaps`。这表示部分组件已经成功，不等于完整成功。Agent 必须分别保留：
+
+- `geometry`
+- `dfm`
+- `machining`
+- `preview`
+
+每个组件自己的状态和错误码。不要因为 3D 成功就声称工时也成功，也不要因为 DFM 缺失而隐藏已经完成的几何结果。
+
+如果用户只想继续查看某一部分，可在现有批次上提取，不要重新上传：
+
+```bash
+aximelo analyze status <batch-id> --extract overview
+aximelo analyze status <batch-id> --extract geometry
+aximelo analyze status <batch-id> --extract stock
+aximelo analyze status <batch-id> --extract machining
+aximelo analyze status <batch-id> --extract route
+aximelo analyze status <batch-id> --extract dfm
+aximelo analyze status <batch-id> --extract preview
+```
+
+`--extract`、`--compact-json` 和 `--json` 互斥，不能同时使用。
+
+## 本地成本估算
+
+Aximelo 公共服务不返回平台价格或交期。本地成本估算只在以下条件全部满足时使用：
+
+1. 实际采用路线是可执行三轴；
+2. `manual_quote_required=false`；
+3. 有有效的三轴装夹次数；
+4. 用户明确要求估价，并提供本地费率。
+
+费率只保存在用户机器上的 `aximelo/cost-profile.json`，不会上传。缺少配置且用户要求估价时，应一次询问：开机固定费、编程费、机时费、每次装夹费和材料单价，再保存：
 
 ```bash
 aximelo cost-profile configure
 aximelo cost-profile show --json
-aximelo cost-profile material set 7075 --price-per-kg 36
-aximelo cost-profile stock-adjustment set --block-allowance-per-side-mm 2 --round-up-mm 5
 ```
 
-长方体单边余量、圆柱径向余量和圆柱端面余量默认均为 `3 mm`，默认不取整。即长方体长宽高各增加 `6 mm`，圆柱直径和长度各增加 `6 mm`。可分别修改三种余量和尺寸向上取整粒度。CLI/Skill 更新不会覆盖现有配置；新建成本配置采用上述默认值。
-
-Agent 仅在实际采用路线是可执行三轴、`manual_quote_required=false` 且有有效装夹次数时使用固定公式直接计算，不调用本地或服务端报价引擎。五轴、人工报价或缺少路线证明的结果不计算本地价格：
+计算公式：
 
 ```text
 总价 = 开机固定费 + 编程费
-     + 数量 × (总工时 × 机时费 + 装夹次数 × 装夹费 + 调整后毛坯重量 × 材料单价)
+     + 数量 × (
+         H2 总工时 ÷ 60 × 机时费
+         + 装夹次数 × 每次装夹费
+         + 调整后毛坯重量 × 材料单价
+       )
 ```
 
-开机费和编程费每款零件只收一次；机时、装夹和材料随数量增长。中间值不舍入，最终金额按币种保留两位小数。非零费用项缺少对应分析数据时不得编造总价。
+开机费和编程费每款零件只收一次；机时、装夹和材料随数量增加。中间值不舍入，最终金额按币种保留两位小数。五轴、人工报价路线或缺少有效数据时，只说明为什么不能本地估价，不要猜价格。
 
-## 更新与帮助
+## 安装完成后应怎样回复用户
+
+安装 Agent 不应只回复“安装完成”。建议回复：
+
+```text
+Aximelo 制造分析 Skill 已安装并通过连通性检查。
+
+你现在可以选中一个 STEP/STP 或受支持的原生 CAD 单零件文件，直接问我它能不能加工、尺寸和毛坯是多少、建议三轴还是五轴、需要几次装夹、H2 工时和 DFM 风险如何。我只会读取你明确指定的文件，不会扫描目录或相邻文件。
+
+公共分析不返回平台价格。如果实际采用路线是可执行三轴，并且你需要本地成本估算，我可以再帮你配置开机费、编程费、机时费、装夹费和材料单价；这些费率只保存在本机。
+```
+
+用户没有要求估价时，不要阻塞安装去追问费率。
+
+## 更新与排查
+
+更新 CLI 并刷新 Skill：
 
 ```bash
-aximelo update --agent codex
-aximelo update --check --json
-aximelo --help
-aximelo analyze --help
-aximelo cost-profile --help
-aximelo doctor --help
+aximelo update --agent codex --json
 ```
 
-更新会刷新 `aximelo` Skill，不会读取或覆盖本地成本配置，也不会读取零件文件。默认分析服务地址为 `https://api.aximelo.ai`。
+Claude Code 使用 `--agent claude`。更新不会覆盖已有本地成本配置。
+
+安装或连接失败时依次检查：
+
+```bash
+node --version
+npm view @aximelo/cli version
+aximelo doctor --json
+aximelo --help
+```
+
+默认制造分析服务为 `https://api.aximelo.ai`，结果页面为 `https://app.aximelo.ai`，npm 包为 `@aximelo/cli`，Skill 名称为 `aximelo`。
 
 ---
 
-# Aximelo Part Analysis CLI and Skill
+## English quick install
 
-Install Node.js 20+, then run `npm install -g @aximelo/cli@latest` and `aximelo install --agent codex`. The CLI accepts explicitly named STEP/STP and supported native single-part CAD files for manufacturing analysis. Any native-CAD preprocessing remains internal; the public CLI and Skill do not offer standalone format conversion or derived CAD downloads. Assemblies and meshes are rejected. The Agent must describe results as Aximelo output and summarize file safety, geometry/stock, H2 raw times, routes, applicable three-axis setup count, DFM, and the seven-day public result link. The public service never returns platform pricing or lead time. Local pricing is allowed only for a selected executable three-axis route, and rates stay on the user's machine.
+Requires Node.js 20 or later:
+
+```bash
+npm install -g @aximelo/cli@latest
+aximelo install --agent codex --json
+aximelo doctor --json
+```
+
+Use `--agent claude` for Claude Code and `--agent all` only when both targets are explicitly requested. After installation, analyze only explicitly selected supported single-part CAD files. Never scan directories or adjacent files. Aximelo returns geometry, minimum and actual stock, H2 raw toolpath time, route, applicable three-axis setup prediction, DFM and 3D preview. Public analysis returns no platform price or lead time; local rates stay on the user's machine and may be used only for an executable selected three-axis route.

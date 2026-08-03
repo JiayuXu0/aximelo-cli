@@ -15,8 +15,8 @@ aximelo cost-profile show --json
 
 Successful API requests check npm at most once every 24 hours. When a newer CLI exists, human output and structured JSON include an update notice; analysis never auto-installs an update.
 
-完整安装资料：<https://www.aximelo.ai/zh-cn/agent-install/>
+给 Agent 直接读取的安装资料：<https://www.aximelo.ai/open/aximelo-cli/installation.md>
 
-开发验证：`npm install && npm run verify`。文档同步：`npm run export:site-docs -- ../poieza-quote-frontend`。
+开发验证：`npm install && npm run verify`。文档同步：`npm run export:site-docs -- ../AximeloSkillWeb`。
 
 License: MIT
