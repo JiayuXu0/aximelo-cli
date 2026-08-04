@@ -1,4 +1,4 @@
 interface:
   display_name: "Aximelo 零件分析"
-  short_description: "分析 H2 原始工时与三五轴路线，仅三轴可做本地成本估算"
-  default_prompt: "Use $aximelo to analyze the explicitly provided single-part CAD files, explain H2 route selection, and calculate a local estimate only for a selected executable three-axis route."
+  short_description: "分析 H2 原始工时并给出三轴、车铣或五轴建议"
+  default_prompt: "Use $aximelo to analyze the explicitly provided single-part CAD files, show the one final three-axis, mill-turn, or five-axis recommendation, and calculate a local estimate only when a valid three-axis setup count is present."

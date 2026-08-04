@@ -23,7 +23,7 @@ import {
 } from "./cost-profile.js";
 import {
   COMPACT_SECTIONS,
-  analysisResultInMinutes,
+  normalizeAnalysisResult,
   compactAnalysisResult,
   extractCompactAnalysisResult,
   isCompactSection,
@@ -309,8 +309,8 @@ function emitAnalysisResult(json: boolean, compactJson: boolean, section: Compac
   else if (compactJson) process.stdout.write(`${JSON.stringify(withUpdateNotice(compactAnalysisResult(result), updateNotice))}\n`);
   else emit(json, {
     ok: result.status === "completed" || result.status === "completed_with_gaps",
-    format: "cli-json-v2",
-    batch: analysisResultInMinutes(result),
+    format: "cli-json-v3",
+    batch: normalizeAnalysisResult(result),
   }, formatAnalysisResult(result), updateNotice);
   if (result.status === "failed" || result.status === "expired") process.exitCode = 5;
   else if (!isBatchTerminal(result.status)) process.exitCode = 3;
@@ -411,10 +411,10 @@ function atomicCapabilities(): string[] {
     "最小毛坯形状/尺寸/体积/密度/重量",
     "显式方料/圆料输入，以及实际加工毛坯的输入尺寸、解析方向和质量",
     "H2 原始总工时、六阶段工时，以及孔加工/粗加工/精加工/倒角去毛刺四类 CNC 工时",
-    "三/五轴类别、H2 推荐路线、实际采用路线、时间口径与三轴装夹次数",
+    "一个三轴/车铣/五轴建议，以及适用时的一份三轴装夹次数",
     "DFM findings/建议/关联 3D 节点",
     "3D 预览与缩略图",
-    "仅对实际采用的可执行三轴路线做本地透明成本估算",
+    "仅在建议为三轴且存在有效装夹次数时做本地透明成本估算",
   ];
 }
 
@@ -427,7 +427,7 @@ function formatInstall(paths: string[], profile: string, includeCapabilities: bo
     profile === "missing" ? `本地成本配置尚未创建：${costProfilePath()}` : `本地成本配置：${profile === "existing" ? "已保留" : "已创建"}`,
     profile === "missing"
       ? "如需本地成本估算，可继续配置开机固定费、编程费、机时费、装夹费和材料单价；费率只保存在本机。"
-      : "公共服务不返回平台价格；仅对实际采用的可执行三轴路线，Agent 才会使用本机费率透明计算。",
+      : "公共服务不返回平台价格；仅在建议为三轴且存在有效装夹次数时，Agent 才会使用本机费率透明计算。",
   ].join("\n");
 }
 
@@ -474,7 +474,7 @@ function formatPart(item: AnalysisResult): string[] {
     }
   }
   if (item.machining) {
-    const route = item.machining.route;
+    const routeRecommendation = item.machining.route_recommendation;
     const machiningStock = item.machining.stock;
     if (machiningStock) {
       lines.push(`- 加工毛坯来源：${stockDerivationLabel(machiningStock.derivation_mode, machiningStock.source)}`);
@@ -485,7 +485,7 @@ function formatPart(item: AnalysisResult): string[] {
       else if (machiningStock.frame) lines.push(`- 毛坯坐标系：原点 [${machiningStock.frame.origin_mm.join(", ")}]；局部轴方向已提供`);
       lines.push(`- 毛坯包络：${machiningStock.envelope_contains_part ? "通过" : "失败"}；${machiningStock.volume_cm3} cm³ / ${machiningStock.mass_kg} kg`);
     }
-    lines.push(`- H2 原始刀路总工时：${formatHoursAsMinutes(item.machining.total_processing)} 分钟；估算等级：${item.machining.estimate_grade ?? "未知"}`);
+    lines.push(`- H2 原始刀路总工时：${formatMinutes(item.machining.total_processing_minutes)} 分钟；估算等级：${item.machining.estimate_grade ?? "未知"}`);
     const cnc = item.machining.cnc_breakdown_minutes;
     if (cnc) {
       lines.push("- CNC 分类工时（与阶段工时是同一总工时的另一种归类，不重复相加）：");
@@ -494,23 +494,22 @@ function formatPart(item: AnalysisResult): string[] {
       lines.push(`  - 精加工：${formatMinutes(cnc.finishing)} 分钟`);
       lines.push(`  - 倒角去毛刺：${formatMinutes(cnc.deburring)} 分钟`);
     }
-    if (route) {
-      lines.push(`- 加工类别：${routeLabel(route.machining_class)}；H2 推荐路线：${routeLabel(route.recommended_route?.route_class)}；实际采用路线：${route.manual_quote_required ? "需要人工报价" : routeLabel(route.selected_route?.route_class)}；时间口径：${route.time_basis}`);
-      if (route.selected_route?.route_class === "mill_3axis" && route.setup_count !== undefined) {
-        const confidence = item.machining.setup_count_confidence ?? route.setup_count_confidence;
-        const prediction = item.machining.setup_prediction ?? route.setup_prediction;
+    if (routeRecommendation) {
+      lines.push(`- 建议路线：${routeLabel(routeRecommendation)}`);
+      if (routeRecommendation === "three_axis" && item.machining.setup_count !== undefined) {
+        const confidence = item.machining.setup_count_confidence;
+        const model = item.machining.setup_model;
         const confidenceText = confidence === undefined ? "未知" : `${(confidence * 100).toFixed(1)}%`;
-        lines.push(`- 机器学习装夹：${route.setup_count} 次；置信度：${confidenceText}`);
-        if (prediction?.validation_status === "development_only_unvalidated") {
-          lines.push(`  - 模型：${prediction.model_version}（当前最佳 development-only，未做 validation 认证）`);
+        lines.push(`- 机器学习装夹：${item.machining.setup_count} 次；置信度：${confidenceText}`);
+        if (model?.validation_status === "development_only_unvalidated") {
+          lines.push(`  - 模型：${model.version}（当前最佳 development-only，未做 validation 认证）`);
         }
       }
-      if (route.manual_quote_required) lines.push(`- 报价状态：需要人工报价；CLI/Skill 不计算本地价格${route.manual_quote_reason_codes?.length ? `（${route.manual_quote_reason_codes.join("、")}）` : ""}`);
     } else {
-      lines.push("- 路线状态：旧结果未提供路线投影；为避免误报价，Skill 不应计算本地价格");
+      lines.push("- 建议路线：不可用；Skill 不应计算本地价格");
     }
     if (item.machining.stages?.length) lines.push("- 规划阶段工时：");
-    for (const stage of item.machining.stages ?? []) lines.push(`  - ${stageLabel(stage.code)}：${formatHoursAsMinutes(stage.hours)} 分钟`);
+    for (const stage of item.machining.stages ?? []) lines.push(`  - ${stageLabel(stage.code)}：${formatMinutes(stage.minutes)} 分钟`);
   }
   const findings = publicFindings(item);
   if (findings.length) lines.push("- DFM 风险：", ...findings.map((finding) => `  - ${finding}`));
@@ -528,7 +527,7 @@ function stockDerivationLabel(mode: string | undefined, source: string): string 
 }
 
 function routeLabel(value: string | undefined): string {
-  return ({ mill_3axis: "三轴铣削", mill_5axis: "五轴铣削", mill_5axis_required: "必须五轴", mill_turn: "车铣复合" } as Record<string, string>)[value ?? ""] ?? value ?? "不可用";
+  return ({ three_axis: "三轴", five_axis: "五轴", mill_turn: "车铣复合" } as Record<string, string>)[value ?? ""] ?? value ?? "不可用";
 }
 
 function publicFindings(item: AnalysisResult): string[] {
@@ -544,10 +543,6 @@ function publicFindings(item: AnalysisResult): string[] {
 
 function stageLabel(code: string): string {
   return ({ roughing: "粗加工", semi_finishing: "半精加工", finishing: "精加工", holemaking: "孔加工", threading: "螺纹", machine_actions: "机内动作" } as Record<string, string>)[code] ?? code;
-}
-
-function formatHoursAsMinutes(hours: number): string {
-  return formatMinutes(hours * 60);
 }
 
 function formatMinutes(minutes: number): string {

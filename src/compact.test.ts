@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analysisResultInMinutes, compactAnalysisResult, extractCompactAnalysisResult, isSetupCountDfmText } from "./compact.js";
+import { compactAnalysisResult, extractCompactAnalysisResult, isSetupCountDfmText, normalizeAnalysisResult } from "./compact.js";
 import type { AnalysisBatchResult, AnalysisResult } from "./types.js";
 
 describe("compact agent analysis output", () => {
@@ -20,7 +20,7 @@ describe("compact agent analysis output", () => {
 
     expect(compact).toMatchObject({
       ok: true,
-      format: "agent-summary-v2",
+      format: "agent-summary-v3",
       batch: { item_count: 5 },
     });
     expect(compact.batch.items.map((item) => item.file_name)).toEqual([
@@ -82,7 +82,15 @@ describe("compact agent analysis output", () => {
       expires_at: "2026-08-06T00:00:00Z",
     });
 
-    expect(compact.batch.items[0]?.machining?.route?.setup_count).toBe(2);
+    expect(compact.batch.items[0]?.machining).toMatchObject({
+      setup_count: 2,
+      route_recommendation: "three_axis",
+    });
+    const serialized = JSON.stringify(compact.batch.items[0]?.machining);
+    expect(serialized.match(/"setup_count"/g)).toHaveLength(1);
+    expect(serialized).not.toContain("predicted_count");
+    expect(serialized).not.toContain("recommended_route");
+    expect(serialized).not.toContain("selected_route");
     expect(compact.batch.items[0]?.dfm).toMatchObject({
       risk_level: "none",
       finding_count: 0,
@@ -108,7 +116,7 @@ describe("compact agent analysis output", () => {
 
     expect(extracted).toMatchObject({
       ok: true,
-      format: "agent-extract-v2",
+      format: "agent-extract-v3",
       batch: { item_count: 5, extract: "route" },
     });
     expect(extracted.batch.items.map((item) => item.file_name)).toEqual([
@@ -121,11 +129,7 @@ describe("compact agent analysis output", () => {
     expect(extracted.batch.items[2]).toMatchObject({
       index: 3,
       file_name: "part-3.step",
-      content: {
-        machining_class: "mill_3axis",
-        setup_count: 2,
-        selected_route: { route_class: "mill_3axis" },
-      },
+      content: "three_axis",
     });
     expect(extracted.batch.items[0]?.content).not.toHaveProperty("geometry");
     expect(extracted.batch.items[0]?.content).not.toHaveProperty("dfm");
@@ -154,8 +158,8 @@ describe("compact agent analysis output", () => {
       .toBe(false);
   });
 
-  it("converts full CLI JSON machining fields to minutes without retaining hour fields", () => {
-    const converted = analysisResultInMinutes({
+  it("keeps the API minute contract and removes the duplicate result path", () => {
+    const converted = normalizeAnalysisResult({
       batch_id: "batch-json",
       status: "completed",
       result_path: "/tools/part-analysis/results/batch-json",
@@ -173,6 +177,8 @@ describe("compact agent analysis output", () => {
       },
     });
     expect(converted.items[0]?.machining?.stages[0]).toEqual({ code: "stage-0", minutes: 6 });
+    expect(converted.result_url).toBe("/tools/part-analysis/results/batch-json");
+    expect(converted).not.toHaveProperty("result_path");
     const serialized = JSON.stringify(converted.items[0]?.machining);
     expect(serialized).not.toContain("total_processing\"");
     expect(serialized).not.toContain("hours");
@@ -215,31 +221,20 @@ function part(index: number): AnalysisResult {
       },
     },
     machining: {
-      total_processing: 1.5,
+      total_processing_minutes: 90,
       estimate_grade: "trusted",
       setup_count: 2,
       setup_count_confidence: 0.9,
-      setup_prediction: {
-        status: "learned_prediction",
-        predicted_count: 2,
-        model_version: "as-setup-ordinal-hybrid-development-v1",
-        model_sha256: "e".repeat(64),
-        feature_schema_version: "autocam.setup-count-features.as-hybrid.v3",
+      setup_model: {
+        version: "as-setup-ordinal-hybrid-ml-only-development-v3",
+        sha256: "e".repeat(64),
+        feature_schema_version: "autocam.setup-count-features.as-hybrid.v7",
         deployment_status: "authoritative_unverified",
         validation_status: "development_only_unvalidated",
       },
       cnc_breakdown_minutes: { holemaking: 15, roughing: 45, finishing: 24, deburring: 6 },
-      stages: Array.from({ length: 20 }, (_, stage) => ({ code: `stage-${stage}`, hours: 0.1 })),
-      route: {
-        machining_class: "mill_3axis",
-        time_basis: "toolpath",
-        toolpath_executable: true,
-        setup_count: 2,
-        setup_count_confidence: 0.9,
-        manual_quote_required: false,
-        recommended_route: route(),
-        selected_route: route(),
-      },
+      stages: Array.from({ length: 20 }, (_, stage) => ({ code: `stage-${stage}`, minutes: 6 })),
+      route_recommendation: "three_axis",
       ...(index === 1 ? {
         stock: {
           shape: "block" as const,
@@ -300,20 +295,5 @@ function setupCountFinding() {
     message_en: "Too many setups",
     blocking: false,
     viewer_node_ids: [10, 12, 13],
-  };
-}
-
-function route() {
-  return {
-    process_family: "milling" as const,
-    kinematics: "3axis",
-    route_class: "mill_3axis" as const,
-    time_basis: "toolpath",
-    toolpath_executable: true,
-    estimated_seconds: 5400,
-    required_region_coverage: 1,
-    reason_codes: [],
-    setup_count: 2,
-    reclamp_count: 1,
   };
 }

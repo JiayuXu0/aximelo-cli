@@ -91,50 +91,20 @@ export interface AnalysisDfm {
   findings: DfmFinding[];
 }
 
-export interface AutoCamRoute {
-  process_family: "milling" | "turning" | "mill_turn";
-  kinematics: string;
-  route_class: "mill_3axis" | "mill_5axis" | "mill_turn";
-  time_basis: string;
-  toolpath_executable: boolean;
-  estimated_seconds: number;
-  required_region_coverage: number;
-  reason_codes: string[];
-  setup_count?: number;
-  reclamp_count?: number;
-}
-
-export interface AutoCamRouteProjection {
-  machining_class: "mill_3axis" | "mill_5axis_required";
-  recommended_route?: AutoCamRoute;
-  selected_route?: AutoCamRoute;
-  route_options?: AutoCamRoute[];
-  time_basis: string;
-  toolpath_executable: boolean;
-  setup_count?: number;
-  setup_count_confidence?: number;
-  setup_prediction?: SetupPrediction;
-  manual_quote_required: boolean;
-  manual_quote_reason_codes?: string[];
-}
-
-export interface SetupPrediction {
-  status: "learned_prediction";
-  predicted_count: number;
-  model_version: string;
-  model_sha256: string;
+export interface SetupModel {
+  version: string;
+  sha256: string;
   feature_schema_version: string;
   deployment_status: "authoritative" | "authoritative_unverified";
   validation_status: "development_only_unvalidated" | "validation_certified";
 }
 
 export interface MachiningTime {
-  source?: "autocam";
   setup_count?: number;
   setup_count_confidence?: number;
-  setup_prediction?: SetupPrediction;
+  setup_model?: SetupModel;
   estimate_grade?: string;
-  stages?: Array<{ code: string; hours: number }>;
+  stages?: Array<{ code: string; minutes: number }>;
   /** Alternative minute classification of the same raw total; do not add to stages. */
   cnc_breakdown_minutes?: {
     holemaking: number;
@@ -142,8 +112,8 @@ export interface MachiningTime {
     finishing: number;
     deburring: number;
   };
-  total_processing: number;
-  route?: AutoCamRouteProjection;
+  total_processing_minutes: number;
+  route_recommendation?: "three_axis" | "mill_turn" | "five_axis";
   stock?: MachiningStock;
 }
 

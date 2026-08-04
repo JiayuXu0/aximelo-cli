@@ -91,13 +91,11 @@ aximelo analyze "/absolute/path/round.step" --stock-cylinder 60 25 --wait --comp
 
 ### 2. 加工路线与装夹
 
-- 三轴或五轴加工类别；
-- H2 推荐路线和实际采用路线；
-- 路线是否已有可执行刀路；
-- 时间口径和需要人工报价的原因；
-- 实际采用路线为可执行三轴时，返回机器学习装夹次数、置信度和验证状态。
+- `machining.route_recommendation` 只给一个最终建议：`three_axis`、`mill_turn` 或 `five_axis`；
+- 不再同时输出推荐路线、实际采用路线、候选路线、时间口径或人工报价原因；
+- 内部已选中可执行三轴时，只用顶层 `machining.setup_count` 返回一份机器学习装夹次数，并附置信度和模型验证状态。
 
-五轴路线、人工报价路线或没有可执行三轴证明时，不得编造装夹次数或价格。
+`mill_turn`、`five_axis` 或没有有效三轴装夹次数时，不得编造装夹次数或价格。
 
 ### 3. H2 加工工时
 
@@ -144,10 +142,9 @@ aximelo analyze status <batch-id> --extract preview
 
 Aximelo 公共服务不返回平台价格或交期。本地成本估算只在以下条件全部满足时使用：
 
-1. 实际采用路线是可执行三轴；
-2. `manual_quote_required=false`；
-3. 有有效的三轴装夹次数；
-4. 用户明确要求估价，并提供本地费率。
+1. `machining.route_recommendation == three_axis`；
+2. 有有效的正整数 `machining.setup_count`；
+3. 用户明确要求估价，并提供本地费率。
 
 费率只保存在用户机器上的 `aximelo/cost-profile.json`，不会上传。缺少配置且用户要求估价时，应一次询问：开机固定费、编程费、机时费、每次装夹费和材料单价，再保存：
 
@@ -167,7 +164,7 @@ aximelo cost-profile show --json
        )
 ```
 
-开机费和编程费每款零件只收一次；机时、装夹和材料随数量增加。中间值不舍入，最终金额按币种保留两位小数。五轴、人工报价路线或缺少有效数据时，只说明为什么不能本地估价，不要猜价格。
+开机费和编程费每款零件只收一次；机时、装夹和材料随数量增加。中间值不舍入，最终金额按币种保留两位小数。`mill_turn`、`five_axis` 或缺少有效数据时，只说明为什么不能本地估价，不要猜价格。
 
 ## 安装完成后应怎样回复用户
 
@@ -176,9 +173,9 @@ aximelo cost-profile show --json
 ```text
 Aximelo 制造分析 Skill 已安装并通过连通性检查。
 
-你现在可以选中一个 STEP/STP 或受支持的原生 CAD 单零件文件，直接问我它能不能加工、尺寸和毛坯是多少、建议三轴还是五轴、需要几次装夹、H2 工时和 DFM 风险如何。我只会读取你明确指定的文件，不会扫描目录或相邻文件。
+你现在可以选中一个 STEP/STP 或受支持的原生 CAD 单零件文件，直接问我它能不能加工、尺寸和毛坯是多少、建议三轴、车铣还是五轴、需要几次装夹、H2 工时和 DFM 风险如何。我只会读取你明确指定的文件，不会扫描目录或相邻文件。
 
-公共分析不返回平台价格。如果实际采用路线是可执行三轴，并且你需要本地成本估算，我可以再帮你配置开机费、编程费、机时费、装夹费和材料单价；这些费率只保存在本机。
+公共分析不返回平台价格。如果建议为三轴且有有效装夹次数，并且你需要本地成本估算，我可以再帮你配置开机费、编程费、机时费、装夹费和材料单价；这些费率只保存在本机。
 ```
 
 用户没有要求估价时，不要阻塞安装去追问费率。
@@ -216,4 +213,4 @@ aximelo install --agent codex --json
 aximelo doctor --json
 ```
 
-Use `--agent claude` for Claude Code and `--agent all` only when both targets are explicitly requested. After installation, analyze only explicitly selected supported single-part CAD files. Never scan directories or adjacent files. Aximelo returns geometry, minimum and actual stock, H2 raw toolpath time, route, applicable three-axis setup prediction, DFM and 3D preview. Public analysis returns no platform price or lead time; local rates stay on the user's machine and may be used only for an executable selected three-axis route.
+Use `--agent claude` for Claude Code and `--agent all` only when both targets are explicitly requested. After installation, analyze only explicitly selected supported single-part CAD files. Never scan directories or adjacent files. Aximelo returns geometry, minimum and actual stock, H2 raw toolpath time, one `three_axis`/`mill_turn`/`five_axis` recommendation, applicable three-axis setup prediction, DFM and 3D preview. Public analysis returns no platform price or lead time; local rates stay on the user's machine and may be used only when the recommendation is `three_axis` and a valid setup count is present.

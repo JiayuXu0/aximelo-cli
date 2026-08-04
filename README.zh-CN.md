@@ -74,12 +74,12 @@ aximelo doctor --json
 | --- | --- | --- |
 | 这是一个什么零件？ | 明确标注的全局 X/Y/Z 包围盒、车间长×宽×厚、实体体积、表面积、复杂度和源文件格式 | [图纸尺寸与相关信息](https://www.aximelo.ai/zh-cn/drawing-dimensions/) |
 | 应该选什么毛坯？ | 几何最小毛坯，以及单独展示的实际加工毛坯来源、局部坐标、车间长×宽×厚、体积、重量和包络检查 | [报价前置分析](https://www.aximelo.ai/zh-cn/quote-precheck/) |
-| 应该走三轴还是五轴？ | 加工类别、推荐路线、实际采用路线、时间口径、刀路是否可执行和人工复核原因 | [路线与刀具可达性](https://www.aximelo.ai/zh-cn/toolpath-generation/) |
-| 实际需要几次装夹？ | 实际采用路线为可执行三轴时的装夹次数、置信度和验证状态 | [装夹次数判断](https://www.aximelo.ai/zh-cn/setup-count/) |
+| 应该走三轴、车铣还是五轴？ | 只返回一个最终建议：`three_axis`、`mill_turn` 或 `five_axis` | [路线与刀具可达性](https://www.aximelo.ai/zh-cn/toolpath-generation/) |
+| 实际需要几次装夹？ | 内部选中可执行三轴路线时，只返回一份装夹次数、置信度和验证状态 | [装夹次数判断](https://www.aximelo.ai/zh-cn/setup-count/) |
 | 加工需要多长时间？ | H2 原始刀路总工时、实际返回的规划阶段，以及孔加工、粗加工、精加工和去毛刺分类 | [加工时间](https://www.aximelo.ai/zh-cn/machining-time/) |
 | 哪些地方不好加工？ | 结构化 DFM 严重程度、位置、原因、建议和关联的 3D 节点 | [DFM 检查](https://www.aximelo.ai/zh-cn/dfm/) |
 | 能不能直观看结果？ | 3D 预览和缩略图状态，以及可用时返回的公开结果链接 | [分享分析结果](https://www.aximelo.ai/zh-cn/drawing-sharing/) |
-| 能不能估算本地成本？ | 只对实际采用的可执行三轴路线，使用本机保存的费率做透明估算 | [成本前置检查](https://www.aximelo.ai/zh-cn/quote-precheck/) |
+| 能不能估算本地成本？ | 只在建议为 `three_axis` 且有有效装夹次数时，使用本机保存的费率做透明估算 | [成本前置检查](https://www.aximelo.ai/zh-cn/quote-precheck/) |
 
 H2 总工时、规划阶段工时和四类 CNC 工时是同一份加工时间的不同视图，不能相互重复相加。
 
@@ -90,7 +90,7 @@ H2 总工时、规划阶段工时和四类 CNC 工时是同一份加工时间的
 **零件：** `bracket.step`
 
 - **几何：** 包围盒 120 × 80 × 36 mm；实体体积 184.2 cm³；中等复杂度。
-- **加工路线：** 实际采用可执行三轴铣削；预测需要 2 次装夹，同时显示置信度和验证状态。
+- **加工路线：** 建议 `three_axis`；只显示一份 2 次装夹预测、置信度和验证状态。
 - **H2 工时：** 原始刀路总工时 42.6 分钟。粗加工、精加工、孔加工和去毛刺是这个总工时的分类视图，不是额外工时。
 - **DFM：** 深腔刀具可达性和小径深孔需要在投产前复核；每个问题都说明位置和后续处理建议。
 - **结果状态：** 即使 DFM 或 3D 预览存在缺口，已经完成的几何和工时结果也会继续保留，不会被包装成“全部成功”。
@@ -147,14 +147,14 @@ aximelo analyze status <batch-id> --extract dfm
 
 ## 本地成本配置
 
-公共服务不返回平台价格和交期。只有用户明确要求本地估算，并且实际采用路线是有完整依据的可执行三轴路线时，Aximelo 才能使用本机费率计算。
+公共服务不返回平台价格和交期。只有用户明确要求本地估算，且 `route_recommendation` 为 `three_axis`、存在有效 `setup_count` 并具备其余必要数据时，Aximelo 才能使用本机费率计算。公共结果不再同时暴露“推荐路线”和“实际路线”两个对象。
 
 ```bash
 aximelo cost-profile configure
 aximelo cost-profile show --json
 ```
 
-开机费、编程费、机时费、装夹费和材料单价只保存在用户机器上的 `aximelo/cost-profile.json`，不会上传。五轴路线或需要人工报价的路线不会得到一个猜出来的价格。
+开机费、编程费、机时费、装夹费和材料单价只保存在用户机器上的 `aximelo/cost-profile.json`，不会上传。`mill_turn` 或 `five_axis` 建议不会得到一个猜出来的价格。
 
 ## 更新与排查
 

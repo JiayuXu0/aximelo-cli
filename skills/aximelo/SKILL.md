@@ -1,6 +1,6 @@
 ---
 name: aximelo
-description: Analyze explicitly provided STEP/STP or supported native single-part CAD files with Aximelo and optionally calculate a local estimate only for an executable selected three-axis route using the user's saved cost profile. Use for part dimensions, minimum stock, raw H2 toolpath time and stages, three/five-axis routes, three-axis setup count, DFM, 3D preview, local cost estimates, or Aximelo CLI installation/update requests.
+description: Analyze explicitly provided STEP/STP or supported native single-part CAD files with Aximelo and optionally calculate a local estimate only when the final recommendation is three-axis and a valid setup count is present, using the user's saved cost profile. Use for part dimensions, minimum stock, raw H2 toolpath time and stages, three-axis/mill-turn/five-axis recommendations, three-axis setup count, DFM, 3D preview, local cost estimates, or Aximelo CLI installation/update requests.
 ---
 
 # Aximelo Part Analysis
@@ -13,7 +13,7 @@ Use the Aximelo public service for manufacturing analysis only. It never returns
 - Read part bounding-box dimensions, solid volume, surface area, and complexity.
 - Read minimum stock shape, dimensions, volume, density, and mass.
 - Submit a known block or cylindrical blank and read its declared dimensions, resolved orientation, containment proof, actual volume, and mass separately from minimum stock.
-- Read H2 raw toolpath total/stage times and the four-category CNC breakdown (holemaking, roughing, finishing, deburring), plus machining class, recommended route, selected route, time basis, three-axis setup count, and estimate grade.
+- Read H2 raw toolpath total/stage times and the four-category CNC breakdown (holemaking, roughing, finishing, deburring), plus one final three-axis/mill-turn/five-axis recommendation, applicable three-axis setup count, and estimate grade.
 - Read structured DFM findings, suggestions, and associated 3D node IDs.
 - Read 3D preview and thumbnail state and links.
 - Configure/show local fixed fees, hourly/setup rates, material prices, and stock adjustments.
@@ -48,7 +48,7 @@ Native single-part CAD uses the same analysis command and may report `source_for
 aximelo analyze "/exact/path/native.x_t" --wait --compact-json
 ```
 
-For known block dimensions, their order is nominal and does not assert X/Y/Z. AutoCam resolves the enclosing axis permutation:
+For known block dimensions, their order is nominal and does not assert X/Y/Z. Aximelo resolves the enclosing axis permutation:
 
 ```bash
 aximelo analyze "/exact/path/a.step" --stock-box 20 868 175 --wait --compact-json
@@ -62,7 +62,7 @@ aximelo analyze "/exact/path/b.step" --stock-cylinder 60 25 --wait --compact-jso
 
 `--stock-box` and `--stock-cylinder` are mutually exclusive. One stock flag applies to every explicitly listed file in that CLI invocation, so split the batch when files have different blanks. If the explicit blank does not contain the part, report `AUTOCAM_INVALID_STOCK`; do not retry without the blank.
 
-Always use `--compact-json` for normal analysis and status polling. It returns `agent-summary-v2`, keeps every batch item in input order, expresses machining time as `total_processing_minutes`, `stages[].minutes`, and `cnc_breakdown_minutes`, and limits only verbose DFM text, node IDs, and excess stage entries. Check every `*_omitted` field and state the omitted count when it is non-zero. Never use full analysis `--json` by default: although `cli-json-v2` also normalizes all machining time to minutes, it can exhaust the Agent tool-output budget before later files appear. Use `--json` only when the user explicitly requests the complete machine payload for debugging; redirect it to a file instead of printing it into the conversation. Do not rerun an analysis merely to recover omitted detail; use the public result page.
+Always use `--compact-json` for normal analysis and status polling. It returns `agent-summary-v3`, keeps every batch item in input order, expresses machining time as `total_processing_minutes`, `stages[].minutes`, and `cnc_breakdown_minutes`, and limits only verbose DFM text, node IDs, and excess stage entries. Check every `*_omitted` field and state the omitted count when it is non-zero. Never use full analysis `--json` by default: `cli-json-v3` can exhaust the Agent tool-output budget before later files appear. Use `--json` only when the user explicitly requests the complete machine payload for debugging; redirect it to a file instead of printing it into the conversation. Do not rerun an analysis merely to recover omitted detail; use the public result page.
 
 When the user asks for one category from an existing batch, query the batch without uploading again:
 
@@ -71,7 +71,7 @@ aximelo analyze status <batch-id> --extract dfm
 aximelo analyze status <batch-id> --extract route
 ```
 
-`--extract` is an independent bounded JSON output mode; never combine it with `--compact-json` or `--json`. It returns `agent-extract-v2`, accepts only `overview`, `geometry`, `stock`, `machining`, `route`, `dfm`, or `preview`, and returns that category for every part in input order. Machining extraction uses minutes. Do not use extraction for a requested local cost estimate because the calculation requires geometry/stock and machining/route together.
+`--extract` is an independent bounded JSON output mode; never combine it with `--compact-json` or `--json`. It returns `agent-extract-v3`, accepts only `overview`, `geometry`, `stock`, `machining`, `route`, `dfm`, or `preview`, and returns that category for every part in input order. Route extraction returns the single recommendation string. Machining extraction uses minutes. Do not use extraction for a requested local cost estimate because the calculation requires geometry/stock and machining together.
 
 Add `--material`, `--process`, `--tolerance`, or `--surface-roughness` only when the user explicitly overrides a default. Do not run `doctor` or `analyze options` first. Use `doctor` only after installation or connection failure; use `analyze options` only when an explicit non-default value or current service format support cannot be mapped.
 
@@ -83,16 +83,14 @@ Keep the stock meanings separate:
 
 - `geometry.minimum_stock` is the geometry-derived minimum envelope.
 - `geometry.bounding_box_xyz_mm` is the part's global X/Y/Z bounding box. `shop_dimensions_mm` always means length/width/thickness and must be labelled separately.
-- `machining.stock` is the blank actually used by AutoCam. Show `derivation_mode`, `input_size_mm`, `resolved_size_mm`, `frame`, `shop_dimensions_mm`, and `envelope_contains_part` when present.
+- `machining.stock` is the blank actually used by machining analysis. Show `derivation_mode`, `input_size_mm`, `resolved_size_mm`, `frame`, `shop_dimensions_mm`, and `envelope_contains_part` when present.
 - For a provided block, preserve `input_size_mm` order and use `resolved_size_mm` only as the blank's local X/Y/Z order when `frame` is present. Do not reorder the user's declared value in the request. For legacy results without `frame`, label the resolved values as dimensions with direction unavailable rather than global X/Y/Z.
 
-Treat `machining.total_processing_minutes`, every `machining.stages[].minutes` value, and every `machining.cnc_breakdown_minutes` value as H2 raw toolpath time. `machining.cnc_breakdown_minutes` is an alternative classification of the same total: semi-finishing belongs to roughing, threading belongs to holemaking, and deburring includes only geometrically evidenced edge breaks and hole-mouth chamfers. Its four values sum to `total_processing_minutes`; never add them to `stages`. If the field is absent in a legacy result, say the detailed CNC breakdown is unavailable rather than inventing it. Use `machining.route` as the route authority:
+Treat `machining.total_processing_minutes`, every `machining.stages[].minutes` value, and every `machining.cnc_breakdown_minutes` value as H2 raw toolpath time. `machining.cnc_breakdown_minutes` is an alternative classification of the same total: semi-finishing belongs to roughing, threading belongs to holemaking, and deburring includes only geometrically evidenced edge breaks and hole-mouth chamfers. Its four values sum to `total_processing_minutes`; never add them to `stages`. If the field is absent in a legacy result, say the detailed CNC breakdown is unavailable rather than inventing it.
 
-- Show `machining_class`, `recommended_route`, `selected_route`, and `time_basis` without rewriting the H2 recommendation.
-- When H2 recommends five-axis but `selected_route.route_class` is `mill_3axis`, explain that the platform selected the executable three-axis alternative and keep the five-axis recommendation visible.
-- Show `setup_count` only when the selected route is executable `mill_3axis`. It is always the machine-learning prediction; show its confidence and validation status. Never describe `development_only_unvalidated` as certified. If the prediction is unavailable, treat machining as unavailable and never substitute another setup count.
-- When `manual_quote_required` is true, or no selected executable three-axis route exists, show the manual reason codes and never invent a setup count or price.
-- Treat a legacy result without `machining.route` as analysis-only; do not calculate a local price from it.
+- Treat `machining.route_recommendation` as the only public route advice. Its value is `three_axis`, `mill_turn`, or `five_axis`; do not reconstruct internal recommended, selected, or candidate routes.
+- Show `machining.setup_count` only when present. It is the one machine-learning prediction for an internally selected executable three-axis route; show `setup_count_confidence` and `setup_model.validation_status`. Never describe `development_only_unvalidated` as certified and never substitute another setup count.
+- For `mill_turn`, `five_axis`, a missing `route_recommendation`, or a missing positive integer `setup_count`, never invent a setup count or local price.
 
 ## Local cost profile
 
@@ -145,7 +143,7 @@ Show both minimum and adjusted stock dimensions whenever an adjustment is applie
 
 ## Cost formula
 
-Before calculating, require all of the following: `machining.route.manual_quote_required == false`, `selected_route.route_class == mill_3axis`, `selected_route.toolpath_executable == true`, and a positive integer `setup_count`. If any check fails, stop the cost calculation and state that the route needs manual quotation or lacks executable three-axis proof.
+Before calculating, require `machining.route_recommendation == three_axis` and a positive integer `machining.setup_count`. The API returns `setup_count` only after internally selecting an executable three-axis route, so no duplicate public executability field is needed. If either check fails, stop the cost calculation and state that the result lacks an executable three-axis setup count.
 
 For each design and requested quantity `q`, calculate:
 
@@ -170,7 +168,7 @@ total = startup_fee_per_design
 
 1. Public share link validity (seven days) and preview availability.
 2. Per-part dimensions, solid volume, surface area, complexity, geometry minimum stock, then actual machining stock with input/resolved direction.
-3. H2 raw total/stage toolpath time, the four-category CNC breakdown including deburring when available, machining class, H2 recommendation, selected route, time basis, and three-axis setup count when applicable.
+3. H2 raw total/stage toolpath time, the four-category CNC breakdown including deburring when available, the single route recommendation, and three-axis setup count when applicable.
 4. Prominent DFM findings and any component gaps.
 5. When price was requested: per-design local cost inputs and breakdown, quantity, final two-decimal total, then batch total.
 
@@ -193,6 +191,6 @@ After a successful install, respond in the user's current language and do not me
 - Explain that supported native single-part CAD can be used as analysis input, while internal preprocessing and derived CAD files are not exposed or downloadable through the public CLI/Skill.
 - Return part dimensions and solid volume, plus geometry minimum-stock facts and the separate actual machining-stock source/input/resolved direction/volume/mass.
 - Return H2 raw total machining time, the actual planner stage times, and the four-category CNC breakdown including deburring when present; never promise or invent a missing category.
-- Return three/five-axis classification, H2 recommended route, selected route, time basis, three-axis setup count when applicable, estimate grade, structured DFM risks/suggestions, and 3D preview/thumbnail links.
+- Return one three-axis/mill-turn/five-axis recommendation, one three-axis setup count when applicable, estimate grade, structured DFM risks/suggestions, and 3D preview/thumbnail links.
 
 Also state that the public service returns no price. If the cost profile is missing, offer to configure startup, programming, machine-hour, setup, and material rates only when the user wants a local estimate. Rates stay on the user's machine. Do not block the installation-complete response by asking for rates when no estimate was requested.

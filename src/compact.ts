@@ -2,7 +2,6 @@ import type {
   AnalysisBatchResult,
   AnalysisComponent,
   AnalysisResult,
-  AutoCamRoute,
   DfmFinding,
 } from "./types.js";
 
@@ -11,38 +10,24 @@ const MAX_WARNINGS = 3;
 const MAX_SUGGESTIONS = 3;
 const MAX_NODE_IDS = 12;
 const MAX_STAGES = 12;
-const MAX_REASON_CODES = 12;
 const MAX_TEXT_CHARS = 170;
 const NON_DFM_SETUP_CODE = "SETUP_COUNT_EXCESSIVE";
 
 export const COMPACT_SECTIONS = ["overview", "geometry", "stock", "machining", "route", "dfm", "preview"] as const;
 export type CompactSection = (typeof COMPACT_SECTIONS)[number];
 
-export function analysisResultInMinutes(result: AnalysisBatchResult) {
+export function normalizeAnalysisResult(result: AnalysisBatchResult) {
+  const { result_path: resultPath, ...batch } = result;
   return {
-    ...result,
-    items: result.items.map((item) => {
-      if (!item.machining) return item;
-      const { total_processing, stages, ...machining } = item.machining;
-      return {
-        ...item,
-        machining: {
-          ...machining,
-          total_processing_minutes: hoursToMinutes(total_processing),
-          stages: (stages ?? []).map((stage) => ({
-            code: stage.code,
-            minutes: hoursToMinutes(stage.hours),
-          })),
-        },
-      };
-    }),
+    ...batch,
+    result_url: result.result_url ?? resultPath,
   };
 }
 
 export function compactAnalysisResult(result: AnalysisBatchResult) {
   return {
     ok: result.status === "completed" || result.status === "completed_with_gaps",
-    format: "agent-summary-v2",
+    format: "agent-summary-v3",
     limited: true,
     limits: {
       findings_per_item: MAX_FINDINGS,
@@ -66,7 +51,7 @@ export function extractCompactAnalysisResult(result: AnalysisBatchResult, sectio
   const compact = compactAnalysisResult(result);
   return {
     ok: compact.ok,
-    format: "agent-extract-v2",
+    format: "agent-extract-v3",
     limited: true,
     limits: compact.limits,
     batch: {
@@ -97,7 +82,7 @@ export function isCompactSection(value: string): value is CompactSection {
 function compactPart(item: AnalysisResult, index: number) {
   const stages = (item.machining?.stages ?? []).map((stage) => ({
     code: stage.code,
-    minutes: hoursToMinutes(stage.hours),
+    minutes: stage.minutes,
   }));
   return {
     index: index + 1,
@@ -128,11 +113,11 @@ function compactPart(item: AnalysisResult, index: number) {
       : undefined,
     machining: item.machining
       ? {
-          total_processing_minutes: hoursToMinutes(item.machining.total_processing),
+          total_processing_minutes: item.machining.total_processing_minutes,
           estimate_grade: item.machining.estimate_grade,
           setup_count: item.machining.setup_count,
           setup_count_confidence: item.machining.setup_count_confidence,
-          setup_prediction: item.machining.setup_prediction,
+          setup_model: item.machining.setup_model,
           stock: item.machining.stock,
           stages: stages.slice(0, MAX_STAGES),
           stages_omitted: Math.max(0, stages.length - MAX_STAGES),
@@ -144,20 +129,7 @@ function compactPart(item: AnalysisResult, index: number) {
                 deburring: item.machining.cnc_breakdown_minutes.deburring,
               }
             : undefined,
-          route: item.machining.route
-            ? {
-                machining_class: item.machining.route.machining_class,
-                time_basis: item.machining.route.time_basis,
-                toolpath_executable: item.machining.route.toolpath_executable,
-                setup_count: item.machining.route.setup_count,
-                setup_count_confidence: item.machining.route.setup_count_confidence,
-                setup_prediction: item.machining.route.setup_prediction,
-                manual_quote_required: item.machining.route.manual_quote_required,
-                manual_quote_reason_codes: limitedStrings(item.machining.route.manual_quote_reason_codes ?? [], MAX_REASON_CODES),
-                recommended_route: compactRoute(item.machining.route.recommended_route),
-                selected_route: compactRoute(item.machining.route.selected_route),
-              }
-            : undefined,
+          route_recommendation: item.machining.route_recommendation,
         }
       : undefined,
     dfm: compactDfm(item),
@@ -183,7 +155,7 @@ function selectContent(item: ReturnType<typeof compactPart>, section: CompactSec
     };
   }
   if (section === "machining") return item.machining ?? null;
-  if (section === "route") return item.machining?.route ?? null;
+  if (section === "route") return item.machining?.route_recommendation ?? null;
   if (section === "dfm") return item.dfm ?? null;
   return item.preview ?? null;
 }
@@ -192,22 +164,6 @@ function compactComponent(component: AnalysisComponent) {
   return {
     status: component.status,
     error_code: compactText(component.error_code),
-  };
-}
-
-function compactRoute(route: AutoCamRoute | undefined) {
-  if (!route) return undefined;
-  return {
-    process_family: route.process_family,
-    kinematics: route.kinematics,
-    route_class: route.route_class,
-    time_basis: route.time_basis,
-    toolpath_executable: route.toolpath_executable,
-    estimated_seconds: route.estimated_seconds,
-    required_region_coverage: route.required_region_coverage,
-    setup_count: route.setup_count,
-    reclamp_count: route.reclamp_count,
-    reason_codes: limitedStrings(route.reason_codes, MAX_REASON_CODES),
   };
 }
 
@@ -261,8 +217,4 @@ function compactText(value: string | undefined): string | undefined {
   if (value === undefined) return undefined;
   const normalized = value.replace(/\s+/g, " ").trim();
   return Array.from(normalized).slice(0, MAX_TEXT_CHARS).join("");
-}
-
-function hoursToMinutes(value: number): number {
-  return Number((value * 60).toFixed(6));
 }

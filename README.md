@@ -75,12 +75,12 @@ For Claude Code, replace `codex` with `claude`. Use `--agent all` only when you 
 | --- | --- | --- |
 | What is this part? | Explicit global X/Y/Z bounding-box dimensions, shop length/width/thickness, solid volume, surface area, complexity, and source format | [Dimensions and related information](https://www.aximelo.ai/en/drawing-dimensions/) |
 | What stock is needed? | Geometry-derived minimum stock and the separate actual machining blank, including its source, local frame, shop length/width/thickness, volume, mass, and containment | [Quote pre-check](https://www.aximelo.ai/en/quote-precheck/) |
-| Three-axis or five-axis? | Machining class, recommended route, selected route, time basis, executability, and manual-review reasons | [Route and tool access](https://www.aximelo.ai/en/toolpath-generation/) |
-| How many setups? | Setup count, confidence, and validation status when the selected route is an executable three-axis route | [Setup-count analysis](https://www.aximelo.ai/en/setup-count/) |
+| Three-axis, mill-turn, or five-axis? | One final route recommendation: `three_axis`, `mill_turn`, or `five_axis` | [Route and tool access](https://www.aximelo.ai/en/toolpath-generation/) |
+| How many setups? | One setup count, confidence, and validation status when an executable three-axis route was selected internally | [Setup-count analysis](https://www.aximelo.ai/en/setup-count/) |
 | How long will machining take? | H2 raw toolpath total, returned planner stages, and holemaking/roughing/finishing/deburring views | [Machining time](https://www.aximelo.ai/en/machining-time/) |
 | What is difficult to manufacture? | Structured DFM severity, location, explanation, suggestion, and related 3D nodes | [DFM checks](https://www.aximelo.ai/en/dfm/) |
 | Can the result be reviewed visually? | 3D preview and thumbnail status, plus a public result link when available | [Share analysis results](https://www.aximelo.ai/en/drawing-sharing/) |
-| Can I estimate local cost? | A transparent local estimate only for a selected executable three-axis route, using rates stored on your machine | [Cost pre-check](https://www.aximelo.ai/en/quote-precheck/) |
+| Can I estimate local cost? | A transparent local estimate only when the recommendation is `three_axis` and a valid setup count is present, using rates stored on your machine | [Cost pre-check](https://www.aximelo.ai/en/quote-precheck/) |
 
 The H2 total, planner stages, and four CNC categories are different views of the same machining time. They must not be added together.
 
@@ -91,7 +91,7 @@ The H2 total, planner stages, and four CNC categories are different views of the
 **Part:** `bracket.step`
 
 - **Geometry:** 120 × 80 × 36 mm bounding box; 184.2 cm³ solid volume; medium complexity.
-- **Machining route:** executable three-axis milling selected; two-setup prediction with confidence shown alongside its validation status.
+- **Machining route:** `three_axis`; one two-setup prediction with confidence shown alongside its validation status.
 - **H2 time:** 42.6 minutes of raw toolpath time. Roughing, finishing, holemaking, and deburring are category views of this total—not extra time.
 - **DFM:** deep-cavity access and a small deep hole need review before production; each finding includes its location and a practical follow-up.
 - **Result:** completed geometry and machining facts remain visible even if DFM or preview finishes with a gap.
@@ -148,14 +148,14 @@ Supported single-part CAD extensions:
 
 ## Local cost profile
 
-The public service returns no platform price or lead time. When a user explicitly requests a local estimate, Aximelo may calculate one only when the selected route is executable three-axis machining and all required evidence is present.
+The public service returns no platform price or lead time. When a user explicitly requests a local estimate, Aximelo may calculate one only when `route_recommendation` is `three_axis`, a valid `setup_count` is present, and all required evidence is available. The public result deliberately does not expose separate selected and recommended route objects.
 
 ```bash
 aximelo cost-profile configure
 aximelo cost-profile show --json
 ```
 
-Startup, programming, machine-hour, setup, and material rates stay in `aximelo/cost-profile.json` on the user's machine and are never uploaded. A five-axis or manual-quote route does not receive an invented local price.
+Startup, programming, machine-hour, setup, and material rates stay in `aximelo/cost-profile.json` on the user's machine and are never uploaded. A `mill_turn` or `five_axis` recommendation does not receive an invented local price.
 
 ## Update and troubleshoot
 
