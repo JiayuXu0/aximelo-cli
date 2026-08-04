@@ -31,6 +31,13 @@ describe("compact agent analysis output", () => {
       "part-5.step",
     ]);
     expect(compact.batch.items[2]).toMatchObject({ index: 3, file_name: "part-3.step" });
+    expect(compact.batch.items[0]?.geometry).toMatchObject({
+      bounding_box_xyz_mm: [100, 80, 20],
+      shop_dimensions_mm: { length: 100, width: 80, thickness: 20 },
+      minimum_stock: {
+        shop_dimensions_mm: { length: 106, width: 86, thickness: 26 },
+      },
+    });
     expect(compact.batch.items[0]?.dfm).toMatchObject({
       finding_count: 19,
       findings_omitted: 13,
@@ -132,6 +139,12 @@ describe("compact agent analysis output", () => {
     const machiningContent = machining.batch.items[0]?.content as { stages: Array<{ code: string; minutes: number }> };
     expect(machiningContent.stages[0]).toEqual({ code: "stage-0", minutes: 6 });
     expect(machining.batch.items[0]?.content).not.toHaveProperty("total_processing");
+
+    const geometry = extractCompactAnalysisResult(result, "geometry");
+    expect(geometry.batch.items[0]?.content).toMatchObject({
+      bounding_box_xyz_mm: [100, 80, 20],
+      shop_dimensions_mm: { length: 100, width: 80, thickness: 20 },
+    });
   });
 
   it("filters route/setup wording without hiding real fixture deformation risks", () => {

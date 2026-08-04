@@ -1,6 +1,6 @@
 {
   "name": "@aximelo/cli",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Manufacturing analysis CLI and Agent Skill for CAD geometry, stock, routes, setups, H2 time, DFM, 3D preview, and private local costing",
   "type": "module",
   "bin": {

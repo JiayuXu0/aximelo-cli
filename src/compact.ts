@@ -12,7 +12,7 @@ const MAX_SUGGESTIONS = 3;
 const MAX_NODE_IDS = 12;
 const MAX_STAGES = 12;
 const MAX_REASON_CODES = 12;
-const MAX_TEXT_CHARS = 180;
+const MAX_TEXT_CHARS = 170;
 const NON_DFM_SETUP_CODE = "SETUP_COUNT_EXCESSIVE";
 
 export const COMPACT_SECTIONS = ["overview", "geometry", "stock", "machining", "route", "dfm", "preview"] as const;
@@ -117,6 +117,8 @@ function compactPart(item: AnalysisResult, index: number) {
           length_mm: item.geometry.length_mm,
           width_mm: item.geometry.width_mm,
           height_mm: item.geometry.height_mm,
+          bounding_box_xyz_mm: item.geometry.bounding_box_xyz_mm,
+          shop_dimensions_mm: item.geometry.shop_dimensions_mm,
           volume_cm3: item.geometry.volume_cm3,
           surface_area_cm2: item.geometry.surface_area_cm2,
           complexity_score: item.geometry.complexity_score,
