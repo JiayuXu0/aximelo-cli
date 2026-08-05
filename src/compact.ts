@@ -4,6 +4,7 @@ import type {
   AnalysisResult,
   DfmFinding,
 } from "./types.js";
+import { isMultiSolidAnalysis, MULTI_SOLID_UNSUPPORTED } from "./multi-solid.js";
 
 const MAX_FINDINGS = 6;
 const MAX_WARNINGS = 3;
@@ -20,6 +21,7 @@ export function normalizeAnalysisResult(result: AnalysisBatchResult) {
   const { result_path: resultPath, ...batch } = result;
   return {
     ...batch,
+    items: result.items.map(sanitizeMultiSolidPart),
     result_url: result.result_url ?? resultPath,
   };
 }
@@ -80,7 +82,9 @@ export function isCompactSection(value: string): value is CompactSection {
 }
 
 function compactPart(item: AnalysisResult, index: number) {
-  const stages = (item.machining?.stages ?? []).map((stage) => ({
+  const multiSolid = isMultiSolidAnalysis(item);
+  const machining = multiSolid ? undefined : item.machining;
+  const stages = (machining?.stages ?? []).map((stage) => ({
     code: stage.code,
     minutes: stage.minutes,
   }));
@@ -95,44 +99,50 @@ function compactPart(item: AnalysisResult, index: number) {
     tolerance: item.tolerance,
     surface_roughness: item.surface_roughness,
     components: Object.fromEntries(
-      Object.entries(item.components).map(([name, component]) => [name, compactComponent(component)]),
+      Object.entries(item.components).map(([name, component]) => [
+        name,
+        multiSolid && (name === "machining" || name === "dfm")
+          ? { status: "unavailable", error_code: MULTI_SOLID_UNSUPPORTED }
+          : compactComponent(component),
+      ]),
     ),
     geometry: item.geometry
       ? {
           length_mm: item.geometry.length_mm,
           width_mm: item.geometry.width_mm,
           height_mm: item.geometry.height_mm,
+          solid_count: item.geometry.solid_count,
           bounding_box_xyz_mm: item.geometry.bounding_box_xyz_mm,
           shop_dimensions_mm: item.geometry.shop_dimensions_mm,
-          volume_cm3: item.geometry.volume_cm3,
-          surface_area_cm2: item.geometry.surface_area_cm2,
-          complexity_score: item.geometry.complexity_score,
-          complexity_level: item.geometry.complexity_level,
-          minimum_stock: item.geometry.minimum_stock,
+          volume_cm3: multiSolid ? undefined : item.geometry.volume_cm3,
+          surface_area_cm2: multiSolid ? undefined : item.geometry.surface_area_cm2,
+          complexity_score: multiSolid ? undefined : item.geometry.complexity_score,
+          complexity_level: multiSolid ? undefined : item.geometry.complexity_level,
+          minimum_stock: multiSolid ? undefined : item.geometry.minimum_stock,
         }
       : undefined,
-    machining: item.machining
+    machining: machining
       ? {
-          total_processing_minutes: item.machining.total_processing_minutes,
-          estimate_grade: item.machining.estimate_grade,
-          setup_count: item.machining.setup_count,
-          setup_count_confidence: item.machining.setup_count_confidence,
-          setup_model: item.machining.setup_model,
-          stock: item.machining.stock,
+          total_processing_minutes: machining.total_processing_minutes,
+          estimate_grade: machining.estimate_grade,
+          setup_count: machining.setup_count,
+          setup_count_confidence: machining.setup_count_confidence,
+          setup_model: machining.setup_model,
+          stock: machining.stock,
           stages: stages.slice(0, MAX_STAGES),
           stages_omitted: Math.max(0, stages.length - MAX_STAGES),
-          cnc_breakdown_minutes: item.machining.cnc_breakdown_minutes
+          cnc_breakdown_minutes: machining.cnc_breakdown_minutes
             ? {
-                holemaking: item.machining.cnc_breakdown_minutes.holemaking,
-                roughing: item.machining.cnc_breakdown_minutes.roughing,
-                finishing: item.machining.cnc_breakdown_minutes.finishing,
-                deburring: item.machining.cnc_breakdown_minutes.deburring,
+                holemaking: machining.cnc_breakdown_minutes.holemaking,
+                roughing: machining.cnc_breakdown_minutes.roughing,
+                finishing: machining.cnc_breakdown_minutes.finishing,
+                deburring: machining.cnc_breakdown_minutes.deburring,
               }
             : undefined,
-          route_recommendation: item.machining.route_recommendation,
+          route_recommendation: machining.route_recommendation,
         }
       : undefined,
-    dfm: compactDfm(item),
+    dfm: multiSolid ? undefined : compactDfm(item),
     preview: item.preview
       ? {
           status: item.preview.status,
@@ -142,6 +152,30 @@ function compactPart(item: AnalysisResult, index: number) {
           error_message: compactText(item.preview.error_message),
         }
       : undefined,
+  };
+}
+
+function sanitizeMultiSolidPart(item: AnalysisResult): AnalysisResult {
+  if (!isMultiSolidAnalysis(item)) return item;
+  return {
+    ...item,
+    components: {
+      ...item.components,
+      machining: { status: "unavailable", error_code: MULTI_SOLID_UNSUPPORTED },
+      dfm: { status: "unavailable", error_code: MULTI_SOLID_UNSUPPORTED },
+    },
+    geometry: item.geometry
+      ? {
+          length_mm: item.geometry.length_mm,
+          width_mm: item.geometry.width_mm,
+          height_mm: item.geometry.height_mm,
+          solid_count: item.geometry.solid_count,
+          bounding_box_xyz_mm: item.geometry.bounding_box_xyz_mm,
+          shop_dimensions_mm: item.geometry.shop_dimensions_mm,
+        }
+      : undefined,
+    machining: undefined,
+    dfm: undefined,
   };
 }
 

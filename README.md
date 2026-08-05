@@ -143,12 +143,13 @@ Supported single-part CAD extensions:
 - Maximum 10 MiB per file and five files per batch.
 - Exact file paths only. Aximelo never scans directories, globs, or neighboring files.
 - Assemblies and meshes such as `.sldasm`, `.asm`, `.iam`, `.catproduct`, `.3dxml`, `.stl`, and `.obj` are rejected.
+- If a file contains more than one solid, Aximelo returns the solid count and aggregate bounding-box dimensions only. Machining, DFM, stock, and local costing are unavailable with `MULTI_SOLID_UNSUPPORTED`.
 - Native-CAD preprocessing is internal to manufacturing analysis. The public CLI does not expose standalone format conversion or derived CAD downloads.
 - A public result link, including 3D access, is valid for seven days. Do not upload a model you are not authorized to share.
 
 ## Local cost profile
 
-The public service returns no platform price or lead time. When a user explicitly requests a local estimate, Aximelo may calculate one only when `route_recommendation` is `three_axis`, a valid `setup_count` is present, and all required evidence is available. The public result deliberately does not expose separate selected and recommended route objects.
+The public service returns no platform price or lead time. When a user explicitly requests a local estimate, Aximelo may calculate one only for a single-solid result when `route_recommendation` is `three_axis`, a valid `setup_count` is present, and all required evidence is available. The public result deliberately does not expose separate selected and recommended route objects.
 
 ```bash
 aximelo cost-profile configure

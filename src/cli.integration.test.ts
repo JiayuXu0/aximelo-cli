@@ -96,8 +96,9 @@ describe("CLI integration", () => {
     expect(payload.capabilities).toContain("只上传明确指定的受支持单零件 CAD 文件，不扫描目录或相邻文件");
     expect(payload.capabilities).toContain("支持 STEP/STP 与受支持原生单零件作为制造分析输入；内部派生文件不对外下载");
     expect(payload.capabilities).toContain("最小毛坯形状/尺寸/体积/密度/重量");
+    expect(payload.capabilities).toContain("多实体文件只返回全部实体的整体长宽高和明确禁报原因，不返回加工或本地估价");
     expect(payload.capabilities).toContain("H2 原始总工时、六阶段工时，以及孔加工/粗加工/精加工/倒角去毛刺四类 CNC 工时");
-    expect(payload.capabilities).toContain("仅在建议为三轴且存在有效装夹次数时做本地透明成本估算");
+    expect(payload.capabilities).toContain("仅对单实体、建议为三轴且存在有效装夹次数的结果做本地透明成本估算");
     await expect(access(join(isolatedHome, ".codex", "skills", "aximelo", "SKILL.md"))).resolves.toBeUndefined();
     await expect(access(join(configRoot, "aximelo", "cost-profile.json"))).rejects.toBeDefined();
   });

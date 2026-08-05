@@ -142,12 +142,13 @@ aximelo analyze status <batch-id> --extract dfm
 - 每个文件最大 10 MiB；每批最多 5 个文件。
 - 只接受明确指定的精确路径，不扫描目录、通配符或相邻文件。
 - 拒绝 `.sldasm`、`.asm`、`.iam`、`.catproduct`、`.3dxml`、`.stl`、`.obj` 等装配体和网格文件。
+- 文件包含多个实体时，Aximelo 只返回实体数量和覆盖全部实体的整体包围盒尺寸；加工、DFM、毛坯和本地估价均不可用，并返回 `MULTI_SOLID_UNSUPPORTED`。
 - 原生 CAD 的必要预处理只用于内部制造分析；公共 CLI 不提供独立格式转换或派生 CAD 文件下载。
 - 公开结果链接及其中的 3D 访问有效 7 天。不要上传你无权分享的模型。
 
 ## 本地成本配置
 
-公共服务不返回平台价格和交期。只有用户明确要求本地估算，且 `route_recommendation` 为 `three_axis`、存在有效 `setup_count` 并具备其余必要数据时，Aximelo 才能使用本机费率计算。公共结果不再同时暴露“推荐路线”和“实际路线”两个对象。
+公共服务不返回平台价格和交期。只有结果为单实体、用户明确要求本地估算、`route_recommendation` 为 `three_axis`、存在有效 `setup_count` 并具备其余必要数据时，Aximelo 才能使用本机费率计算。公共结果不再同时暴露“推荐路线”和“实际路线”两个对象。
 
 ```bash
 aximelo cost-profile configure

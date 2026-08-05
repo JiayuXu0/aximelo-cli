@@ -32,6 +32,7 @@ import {
   type CompactSection,
 } from "./compact.js";
 import { CLI_VERSION, HELP, resolveHelp } from "./help.js";
+import { isMultiSolidAnalysis } from "./multi-solid.js";
 import type { AnalysisBatchResult, AnalysisOptions, AnalysisResult, StockInput } from "./types.js";
 import {
   checkForUpdate,
@@ -408,13 +409,14 @@ function atomicCapabilities(): string[] {
     "只上传明确指定的受支持单零件 CAD 文件，不扫描目录或相邻文件",
     "支持 STEP/STP 与受支持原生单零件作为制造分析输入；内部派生文件不对外下载",
     "零件长宽高、实体体积、表面积与复杂度",
+    "多实体文件只返回全部实体的整体长宽高和明确禁报原因，不返回加工或本地估价",
     "最小毛坯形状/尺寸/体积/密度/重量",
     "显式方料/圆料输入，以及实际加工毛坯的输入尺寸、解析方向和质量",
     "H2 原始总工时、六阶段工时，以及孔加工/粗加工/精加工/倒角去毛刺四类 CNC 工时",
     "一个三轴/车铣/五轴建议，以及适用时的一份三轴装夹次数",
     "DFM findings/建议/关联 3D 节点",
     "3D 预览与缩略图",
-    "仅在建议为三轴且存在有效装夹次数时做本地透明成本估算",
+    "仅对单实体、建议为三轴且存在有效装夹次数的结果做本地透明成本估算",
   ];
 }
 
@@ -459,13 +461,19 @@ function formatAnalysisResult(result: AnalysisBatchResult): string {
 
 function formatPart(item: AnalysisResult): string[] {
   const lines = [`${item.file_name}（${item.status}）`];
+  const multiSolid = isMultiSolidAnalysis(item);
   if (item.source_format) lines.push(`- 源格式：${item.source_format}`);
   if (item.geometry) {
     const boundingBox = item.geometry.bounding_box_xyz_mm ?? [item.geometry.length_mm, item.geometry.width_mm, item.geometry.height_mm];
     lines.push(`- 零件包围盒（全局 X/Y/Z）：${boundingBox.join(" × ")} mm`);
     if (item.geometry.shop_dimensions_mm) lines.push(`- 零件车间尺寸（长×宽×厚）：${formatShopDimensions(item.geometry.shop_dimensions_mm)} mm`);
-    lines.push(`- 实体体积：${item.geometry.volume_cm3} cm³；表面积：${item.geometry.surface_area_cm2} cm²；复杂度：${item.geometry.complexity_level} (${item.geometry.complexity_score})`);
-    const stock = item.geometry.minimum_stock;
+    if (multiSolid) {
+      const count = item.geometry.solid_count;
+      lines.push(`- 多实体提示：检测到${count ? ` ${count} 个` : "多个"}实体；当前仅支持单实体加工报价，本次仅返回整体几何尺寸。`);
+    } else if (item.geometry.volume_cm3 !== undefined && item.geometry.surface_area_cm2 !== undefined && item.geometry.complexity_level && item.geometry.complexity_score !== undefined) {
+      lines.push(`- 实体体积：${item.geometry.volume_cm3} cm³；表面积：${item.geometry.surface_area_cm2} cm²；复杂度：${item.geometry.complexity_level} (${item.geometry.complexity_score})`);
+    }
+    const stock = multiSolid ? undefined : item.geometry.minimum_stock;
     if (stock) {
       const dimensions = stock.shop_dimensions_mm
         ? `长×宽×厚 ${formatShopDimensions(stock.shop_dimensions_mm)} mm`
@@ -473,7 +481,7 @@ function formatPart(item: AnalysisResult): string[] {
       lines.push(`- 几何最小毛坯：${stock.shape}，${dimensions}；${stock.volume_cm3} cm³ / ${stock.mass_kg} kg`);
     }
   }
-  if (item.machining) {
+  if (!multiSolid && item.machining) {
     const routeRecommendation = item.machining.route_recommendation;
     const machiningStock = item.machining.stock;
     if (machiningStock) {
@@ -511,7 +519,7 @@ function formatPart(item: AnalysisResult): string[] {
     if (item.machining.stages?.length) lines.push("- 规划阶段工时：");
     for (const stage of item.machining.stages ?? []) lines.push(`  - ${stageLabel(stage.code)}：${formatMinutes(stage.minutes)} 分钟`);
   }
-  const findings = publicFindings(item);
+  const findings = multiSolid ? [] : publicFindings(item);
   if (findings.length) lines.push("- DFM 风险：", ...findings.map((finding) => `  - ${finding}`));
   for (const [name, component] of Object.entries(item.components)) if (component.status === "failed" || component.status === "unavailable") lines.push(`- ${name}：${component.status}${component.error_code ? ` (${component.error_code})` : ""}`);
   return lines;

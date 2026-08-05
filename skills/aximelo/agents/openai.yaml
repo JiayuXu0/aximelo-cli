@@ -1,4 +1,4 @@
 interface:
   display_name: "Aximelo 零件分析"
-  short_description: "分析 H2 原始工时并给出三轴、车铣或五轴建议"
-  default_prompt: "Use $aximelo to analyze the explicitly provided single-part CAD files, show the one final three-axis, mill-turn, or five-axis recommendation, and calculate a local estimate only when a valid three-axis setup count is present."
+  short_description: "分析单实体 CAD；多实体仅返回整体尺寸与禁报原因"
+  default_prompt: "Use $aximelo to analyze the explicitly provided CAD files, report only aggregate dimensions and the unsupported reason for multi-solid files, and calculate a local estimate only for a valid single-solid three-axis result."

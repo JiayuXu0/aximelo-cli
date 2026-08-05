@@ -183,6 +183,87 @@ describe("compact agent analysis output", () => {
     expect(serialized).not.toContain("total_processing\"");
     expect(serialized).not.toContain("hours");
   });
+
+  it("returns only aggregate dimensions and the reason for multi-solid files", () => {
+    const multiSolid = part(1);
+    multiSolid.status = "completed_with_gaps";
+    multiSolid.geometry = {
+      ...multiSolid.geometry!,
+      solid_count: 2,
+      length_mm: 90,
+      width_mm: 20,
+      height_mm: 8,
+      bounding_box_xyz_mm: [90, 20, 8],
+      shop_dimensions_mm: { length: 90, width: 20, thickness: 8 },
+    };
+    const compact = compactAnalysisResult({
+      batch_id: "batch-multi-solid",
+      status: "completed_with_gaps",
+      result_path: "/tools/part-analysis/results/batch-multi-solid",
+      items: [multiSolid],
+      requested_at: "2026-08-05T00:00:00Z",
+      expires_at: "2026-08-12T00:00:00Z",
+    });
+    const item = compact.batch.items[0]!;
+
+    expect(item.geometry).toEqual({
+      length_mm: 90,
+      width_mm: 20,
+      height_mm: 8,
+      solid_count: 2,
+      bounding_box_xyz_mm: [90, 20, 8],
+      shop_dimensions_mm: { length: 90, width: 20, thickness: 8 },
+      volume_cm3: undefined,
+      surface_area_cm2: undefined,
+      complexity_score: undefined,
+      complexity_level: undefined,
+      minimum_stock: undefined,
+    });
+    expect(item.components).toMatchObject({
+      geometry: { status: "succeeded" },
+      machining: { status: "unavailable", error_code: "MULTI_SOLID_UNSUPPORTED" },
+      dfm: { status: "unavailable", error_code: "MULTI_SOLID_UNSUPPORTED" },
+    });
+    expect(item.machining).toBeUndefined();
+    expect(item.dfm).toBeUndefined();
+
+    const normalized = normalizeAnalysisResult({
+      batch_id: "batch-multi-solid",
+      status: "completed_with_gaps",
+      result_path: "/tools/part-analysis/results/batch-multi-solid",
+      items: [multiSolid],
+      requested_at: "2026-08-05T00:00:00Z",
+      expires_at: "2026-08-12T00:00:00Z",
+    });
+    expect(normalized.items[0]).toMatchObject({
+      geometry: {
+        solid_count: 2,
+        bounding_box_xyz_mm: [90, 20, 8],
+        shop_dimensions_mm: { length: 90, width: 20, thickness: 8 },
+      },
+      components: {
+        machining: { status: "unavailable", error_code: "MULTI_SOLID_UNSUPPORTED" },
+        dfm: { status: "unavailable", error_code: "MULTI_SOLID_UNSUPPORTED" },
+      },
+    });
+    expect(normalized.items[0]?.geometry).not.toHaveProperty("volume_cm3");
+    expect(normalized.items[0]?.geometry).not.toHaveProperty("minimum_stock");
+    expect(normalized.items[0]?.machining).toBeUndefined();
+    expect(normalized.items[0]?.dfm).toBeUndefined();
+
+    const extracted = extractCompactAnalysisResult({
+      batch_id: "batch-multi-solid",
+      status: "completed_with_gaps",
+      result_path: "/tools/part-analysis/results/batch-multi-solid",
+      items: [multiSolid],
+      requested_at: "2026-08-05T00:00:00Z",
+      expires_at: "2026-08-12T00:00:00Z",
+    }, "stock");
+    expect(extracted.batch.items[0]?.content).toEqual({
+      minimum_stock: null,
+      machining_stock: null,
+    });
+  });
 });
 
 function part(index: number): AnalysisResult {

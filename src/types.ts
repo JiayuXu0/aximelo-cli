@@ -130,12 +130,13 @@ export interface AnalysisGeometry {
   length_mm: number;
   width_mm: number;
   height_mm: number;
+  solid_count?: number;
   bounding_box_xyz_mm?: [number, number, number];
   shop_dimensions_mm?: ShopDimensionsMm;
-  volume_cm3: number;
-  surface_area_cm2: number;
-  complexity_score: number;
-  complexity_level: "low" | "medium" | "high";
+  volume_cm3?: number;
+  surface_area_cm2?: number;
+  complexity_score?: number;
+  complexity_level?: "low" | "medium" | "high";
   minimum_stock?: MinimumStock;
 }
 

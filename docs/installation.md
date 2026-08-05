@@ -89,6 +89,8 @@ aximelo analyze "/absolute/path/round.step" --stock-cylinder 60 25 --wait --comp
 
 最小毛坯和实际加工毛坯是两件事，回答时必须分开说明。
 
+若 `geometry.solid_count > 1`，这是多实体文件：只返回实体数量、覆盖全部实体的整体 X/Y/Z 包围盒和车间长×宽×厚，并返回 `MULTI_SOLID_UNSUPPORTED`。不得继续展示体积、表面积、复杂度、毛坯、DFM、加工工时、路线或装夹次数。
+
 ### 2. 加工路线与装夹
 
 - `machining.route_recommendation` 只给一个最终建议：`three_axis`、`mill_turn` 或 `five_axis`；
@@ -142,9 +144,10 @@ aximelo analyze status <batch-id> --extract preview
 
 Aximelo 公共服务不返回平台价格或交期。本地成本估算只在以下条件全部满足时使用：
 
-1. `machining.route_recommendation == three_axis`；
-2. 有有效的正整数 `machining.setup_count`；
-3. 用户明确要求估价，并提供本地费率。
+1. `geometry.solid_count` 缺失或等于 `1`，且没有 `MULTI_SOLID_UNSUPPORTED`；
+2. `machining.route_recommendation == three_axis`；
+3. 有有效的正整数 `machining.setup_count`；
+4. 用户明确要求估价，并提供本地费率。
 
 费率只保存在用户机器上的 `aximelo/cost-profile.json`，不会上传。缺少配置且用户要求估价时，应一次询问：开机固定费、编程费、机时费、每次装夹费和材料单价，再保存：
 
@@ -213,4 +216,4 @@ aximelo install --agent codex --json
 aximelo doctor --json
 ```
 
-Use `--agent claude` for Claude Code and `--agent all` only when both targets are explicitly requested. After installation, analyze only explicitly selected supported single-part CAD files. Never scan directories or adjacent files. Aximelo returns geometry, minimum and actual stock, H2 raw toolpath time, one `three_axis`/`mill_turn`/`five_axis` recommendation, applicable three-axis setup prediction, DFM and 3D preview. Public analysis returns no platform price or lead time; local rates stay on the user's machine and may be used only when the recommendation is `three_axis` and a valid setup count is present.
+Use `--agent claude` for Claude Code and `--agent all` only when both targets are explicitly requested. After installation, analyze only explicitly selected supported single-part CAD files. Never scan directories or adjacent files. Aximelo returns geometry, minimum and actual stock, H2 raw toolpath time, one `three_axis`/`mill_turn`/`five_axis` recommendation, applicable three-axis setup prediction, DFM and 3D preview. A multi-solid file returns only its solid count, aggregate dimensions, preview, and `MULTI_SOLID_UNSUPPORTED`. Public analysis returns no platform price or lead time; local rates stay on the user's machine and may be used only for a single-solid result when the recommendation is `three_axis` and a valid setup count is present.
