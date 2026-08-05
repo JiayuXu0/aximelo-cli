@@ -114,7 +114,7 @@ function compactPart(item: AnalysisResult, index: number) {
           solid_count: item.geometry.solid_count,
           bounding_box_xyz_mm: item.geometry.bounding_box_xyz_mm,
           shop_dimensions_mm: item.geometry.shop_dimensions_mm,
-          volume_cm3: multiSolid ? undefined : item.geometry.volume_cm3,
+          volume_cm3: item.geometry.volume_cm3,
           surface_area_cm2: multiSolid ? undefined : item.geometry.surface_area_cm2,
           complexity_score: multiSolid ? undefined : item.geometry.complexity_score,
           complexity_level: multiSolid ? undefined : item.geometry.complexity_level,
@@ -172,6 +172,7 @@ function sanitizeMultiSolidPart(item: AnalysisResult): AnalysisResult {
           solid_count: item.geometry.solid_count,
           bounding_box_xyz_mm: item.geometry.bounding_box_xyz_mm,
           shop_dimensions_mm: item.geometry.shop_dimensions_mm,
+          volume_cm3: item.geometry.volume_cm3,
         }
       : undefined,
     machining: undefined,

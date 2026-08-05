@@ -89,7 +89,7 @@ aximelo analyze "/absolute/path/round.step" --stock-cylinder 60 25 --wait --comp
 
 最小毛坯和实际加工毛坯是两件事，回答时必须分开说明。
 
-若 `geometry.solid_count > 1`，这是多实体文件：只返回实体数量、覆盖全部实体的整体 X/Y/Z 包围盒和车间长×宽×厚，并返回 `MULTI_SOLID_UNSUPPORTED`。不得继续展示体积、表面积、复杂度、毛坯、DFM、加工工时、路线或装夹次数。
+若 `geometry.solid_count > 1`，这是多实体文件：返回实体数量、覆盖全部实体的整体 X/Y/Z 包围盒、车间长×宽×厚和各有效实体体积之和，并返回 `MULTI_SOLID_UNSUPPORTED`。不得继续展示表面积、复杂度、毛坯、DFM、加工工时、路线或装夹次数。
 
 ### 2. 加工路线与装夹
 
@@ -216,4 +216,4 @@ aximelo install --agent codex --json
 aximelo doctor --json
 ```
 
-Use `--agent claude` for Claude Code and `--agent all` only when both targets are explicitly requested. After installation, analyze only explicitly selected supported single-part CAD files. Never scan directories or adjacent files. Aximelo returns geometry, minimum and actual stock, H2 raw toolpath time, one `three_axis`/`mill_turn`/`five_axis` recommendation, applicable three-axis setup prediction, DFM and 3D preview. A multi-solid file returns only its solid count, aggregate dimensions, preview, and `MULTI_SOLID_UNSUPPORTED`. Public analysis returns no platform price or lead time; local rates stay on the user's machine and may be used only for a single-solid result when the recommendation is `three_axis` and a valid setup count is present.
+Use `--agent claude` for Claude Code and `--agent all` only when both targets are explicitly requested. After installation, analyze only explicitly selected supported single-part CAD files. Never scan directories or adjacent files. Aximelo returns geometry, minimum and actual stock, H2 raw toolpath time, one `three_axis`/`mill_turn`/`five_axis` recommendation, applicable three-axis setup prediction, DFM and 3D preview. A multi-solid file returns its solid count, aggregate dimensions, additive total solid volume, preview, and `MULTI_SOLID_UNSUPPORTED`. Public analysis returns no platform price or lead time; local rates stay on the user's machine and may be used only for a single-solid result when the recommendation is `three_axis` and a valid setup count is present.

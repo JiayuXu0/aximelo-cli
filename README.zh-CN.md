@@ -142,7 +142,7 @@ aximelo analyze status <batch-id> --extract dfm
 - 每个文件最大 10 MiB；每批最多 5 个文件。
 - 只接受明确指定的精确路径，不扫描目录、通配符或相邻文件。
 - 拒绝 `.sldasm`、`.asm`、`.iam`、`.catproduct`、`.3dxml`、`.stl`、`.obj` 等装配体和网格文件。
-- 文件包含多个实体时，Aximelo 只返回实体数量和覆盖全部实体的整体包围盒尺寸；加工、DFM、毛坯和本地估价均不可用，并返回 `MULTI_SOLID_UNSUPPORTED`。
+- 文件包含多个实体时，Aximelo 返回实体数量、覆盖全部实体的整体包围盒尺寸和各有效实体体积之和；加工、DFM、毛坯和本地估价均不可用，并返回 `MULTI_SOLID_UNSUPPORTED`。
 - 原生 CAD 的必要预处理只用于内部制造分析；公共 CLI 不提供独立格式转换或派生 CAD 文件下载。
 - 公开结果链接及其中的 3D 访问有效 7 天。不要上传你无权分享的模型。
 

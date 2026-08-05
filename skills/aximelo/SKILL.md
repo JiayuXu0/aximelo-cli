@@ -11,7 +11,7 @@ Use the Aximelo public service for manufacturing analysis only. It never returns
 
 - Analyze one to five explicitly named supported single-part CAD files in one batch; the service handles any required native-CAD preprocessing only as an internal analysis step.
 - Read part bounding-box dimensions, solid volume, surface area, and complexity.
-- When a file contains multiple solids, read only the aggregate bounding-box dimensions and solid count; machining, DFM, stock, and local costing are unavailable.
+- When a file contains multiple solids, read the aggregate bounding-box dimensions, solid count, and additive total volume; machining, DFM, stock, and local costing are unavailable.
 - Read minimum stock shape, dimensions, volume, density, and mass.
 - Submit a known block or cylindrical blank and read its declared dimensions, resolved orientation, containment proof, actual volume, and mass separately from minimum stock.
 - Read H2 raw toolpath total/stage times and the four-category CNC breakdown (holemaking, roughing, finishing, deburring), plus one final three-axis/mill-turn/five-axis recommendation, applicable three-axis setup count, and estimate grade.
@@ -26,7 +26,7 @@ Use the Aximelo public service for manufacturing analysis only. It never returns
 - Never add adjacent files, drawings, assemblies, or archives.
 - Supported files are `.step`, `.stp`, `.x_t`, `.x_b`, `.sat`, `.sldprt`, `.prt`, `.ipt`, and `.catpart`, each no larger than 10 MiB (10,485,760 bytes).
 - Reject assemblies and meshes, including `.sldasm`, `.asm`, `.iam`, `.catproduct`, `.3dxml`, `.stl`, and `.obj`. Never ask the service to flatten them.
-- If `geometry.solid_count > 1` or machining/DFM reports `MULTI_SOLID_UNSUPPORTED`, state the detected count and aggregate dimensions, then stop manufacturing interpretation for that part. Never show or reconstruct volume, surface area, complexity, stock, DFM, machining time, route, setup count, or a local estimate, even if a legacy payload still contains them.
+- If `geometry.solid_count > 1` or machining/DFM reports `MULTI_SOLID_UNSUPPORTED`, state the detected count, aggregate dimensions, and service-returned additive total volume, then stop manufacturing interpretation for that part. Never reconstruct a missing volume or show surface area, complexity, stock, DFM, machining time, route, setup count, or a local estimate, even if a legacy payload still contains those unsupported fields.
 - Use at most five files per batch. For more than five explicit files, submit sequential groups; never fan out parallel CLI processes.
 - Defaults are material `6061`, process `cnc-machining`, tolerance `ISO2768-m`, and roughness `Ra3.2`. Do not ask about omitted manufacturing parameters.
 - When the user, workbook, drawing, or another authoritative source gives the blank, pass it explicitly. Never omit a known blank and never replace a missing or invalid blank with minimum/derived stock when reproducing a labeled evaluation.
@@ -172,7 +172,7 @@ total = startup_fee_per_design
 
 ## Response order
 
-For a multi-solid part, use this exception to the normal order: share-link/preview status, detected solid count, aggregate X/Y/Z and shop dimensions, then `MULTI_SOLID_UNSUPPORTED`. Do not continue into stock, machining, DFM, or cost.
+For a multi-solid part, use this exception to the normal order: share-link/preview status, detected solid count, aggregate X/Y/Z and shop dimensions, additive total solid volume when returned, then `MULTI_SOLID_UNSUPPORTED`. Do not continue into stock, machining, DFM, or cost.
 
 1. Public share link validity (seven days) and preview availability.
 2. Per-part dimensions, solid volume, surface area, complexity, geometry minimum stock, then actual machining stock with input/resolved direction.

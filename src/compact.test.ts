@@ -184,7 +184,7 @@ describe("compact agent analysis output", () => {
     expect(serialized).not.toContain("hours");
   });
 
-  it("returns only aggregate dimensions and the reason for multi-solid files", () => {
+  it("returns aggregate dimensions, total volume, and the reason for multi-solid files", () => {
     const multiSolid = part(1);
     multiSolid.status = "completed_with_gaps";
     multiSolid.geometry = {
@@ -195,6 +195,7 @@ describe("compact agent analysis output", () => {
       height_mm: 8,
       bounding_box_xyz_mm: [90, 20, 8],
       shop_dimensions_mm: { length: 90, width: 20, thickness: 8 },
+      volume_cm3: 11.041,
     };
     const compact = compactAnalysisResult({
       batch_id: "batch-multi-solid",
@@ -213,7 +214,7 @@ describe("compact agent analysis output", () => {
       solid_count: 2,
       bounding_box_xyz_mm: [90, 20, 8],
       shop_dimensions_mm: { length: 90, width: 20, thickness: 8 },
-      volume_cm3: undefined,
+      volume_cm3: 11.041,
       surface_area_cm2: undefined,
       complexity_score: undefined,
       complexity_level: undefined,
@@ -240,13 +241,14 @@ describe("compact agent analysis output", () => {
         solid_count: 2,
         bounding_box_xyz_mm: [90, 20, 8],
         shop_dimensions_mm: { length: 90, width: 20, thickness: 8 },
+        volume_cm3: 11.041,
       },
       components: {
         machining: { status: "unavailable", error_code: "MULTI_SOLID_UNSUPPORTED" },
         dfm: { status: "unavailable", error_code: "MULTI_SOLID_UNSUPPORTED" },
       },
     });
-    expect(normalized.items[0]?.geometry).not.toHaveProperty("volume_cm3");
+    expect(normalized.items[0]?.geometry?.volume_cm3).toBe(11.041);
     expect(normalized.items[0]?.geometry).not.toHaveProperty("minimum_stock");
     expect(normalized.items[0]?.machining).toBeUndefined();
     expect(normalized.items[0]?.dfm).toBeUndefined();

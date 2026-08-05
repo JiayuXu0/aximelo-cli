@@ -143,7 +143,7 @@ Supported single-part CAD extensions:
 - Maximum 10 MiB per file and five files per batch.
 - Exact file paths only. Aximelo never scans directories, globs, or neighboring files.
 - Assemblies and meshes such as `.sldasm`, `.asm`, `.iam`, `.catproduct`, `.3dxml`, `.stl`, and `.obj` are rejected.
-- If a file contains more than one solid, Aximelo returns the solid count and aggregate bounding-box dimensions only. Machining, DFM, stock, and local costing are unavailable with `MULTI_SOLID_UNSUPPORTED`.
+- If a file contains more than one solid, Aximelo returns the solid count, aggregate bounding-box dimensions, and the additive volume of all valid solids. Machining, DFM, stock, and local costing are unavailable with `MULTI_SOLID_UNSUPPORTED`.
 - Native-CAD preprocessing is internal to manufacturing analysis. The public CLI does not expose standalone format conversion or derived CAD downloads.
 - A public result link, including 3D access, is valid for seven days. Do not upload a model you are not authorized to share.
 
