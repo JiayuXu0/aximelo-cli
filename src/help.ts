@@ -1,4 +1,4 @@
-export const CLI_VERSION = "1.0.3";
+export const CLI_VERSION = "1.0.4";
 
 const shared = `默认分析参数：6061 铝、CNC、ISO 2768-m、Ra 3.2。
 限制：每个零件文件不超过 10 MiB；每批最多 5 个零件。
