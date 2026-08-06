@@ -1,0 +1,6 @@
+interface:
+  display_name: "Aximelo CLI 维护"
+  short_description: "维护公开 CLI、npm Trusted Publishing 与安装清单"
+  default_prompt: "Use $aximelo-cli-maintenance to implement and validate this Aximelo CLI change."
+policy:
+  allow_implicit_invocation: true
