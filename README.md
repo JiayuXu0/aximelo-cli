@@ -184,11 +184,16 @@ npm run verify
 npm pack --dry-run
 ```
 
-To export the canonical installation guide, Skill, and manifest to the website repository:
+To export the canonical installation guide, Skill, and version/SHA manifest to
+the private Aximelo product repository:
 
 ```bash
-npm run export:site-docs -- ../AximeloSkillWeb
+npm run export:site-docs -- ../aximelo/apps/website
 ```
+
+Publishing is initiated by the approved `manufacturing-ops` release workflow.
+This public repository still performs verification, packaging, npm Trusted
+Publishing, and registry read-back; a pushed tag alone does not publish.
 
 ## License
 

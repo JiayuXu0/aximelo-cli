@@ -1,28 +1,29 @@
 name: Publish Aximelo to npm
 
 on:
-  workflow_dispatch:
-  push:
-    tags:
-      - "v*"
+  repository_dispatch:
+    types: [manufacturing-ops-release]
 
 permissions:
   contents: read
   id-token: write
 
 concurrency:
-  group: npm-publish-${{ github.ref }}
+  group: npm-publish-${{ github.event.client_payload.commit }}
   cancel-in-progress: false
 
 jobs:
   publish:
     name: Verify and publish
+    if: github.event.client_payload.source_repository == 'JiayuXu0/manufacturing-ops'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
       - name: Check out source
         uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.client_payload.commit }}
 
       - name: Install Node.js
         uses: actions/setup-node@v7.0.0
@@ -36,11 +37,21 @@ jobs:
           npm install --global npm@latest
           npm --version
 
-      - name: Check release tag
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Verify approved source and version
+        env:
+          EXPECTED_COMMIT: ${{ github.event.client_payload.commit }}
+          EXPECTED_VERSION: ${{ github.event.client_payload.version }}
+          SOURCE_LOCK: ${{ github.event.client_payload.source_lock }}
         run: |
+          test "${EXPECTED_COMMIT}" = "$(git rev-parse HEAD)"
+          test "${#EXPECTED_COMMIT}" -eq 40
+          test -n "${SOURCE_LOCK}"
           PACKAGE_VERSION="$(node --print "require('./package.json').version")"
-          test "v${PACKAGE_VERSION}" = "${GITHUB_REF_NAME}"
+          test "${PACKAGE_VERSION}" = "${EXPECTED_VERSION}"
+          if npm view "@aximelo/cli@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+            echo "@aximelo/cli@${PACKAGE_VERSION} already exists" >&2
+            exit 1
+          fi
 
       - name: Check GitHub OIDC availability
         run: |
@@ -58,3 +69,17 @@ jobs:
 
       - name: Publish public package with npm Trusted Publishing
         run: npm publish --access public
+
+      - name: Read published version back from npm
+        env:
+          EXPECTED_VERSION: ${{ github.event.client_payload.version }}
+        run: |
+          for attempt in $(seq 1 20); do
+            ACTUAL_VERSION="$(npm view "@aximelo/cli@${EXPECTED_VERSION}" version 2>/dev/null || true)"
+            if test "${ACTUAL_VERSION}" = "${EXPECTED_VERSION}"; then
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "npm registry did not return ${EXPECTED_VERSION}" >&2
+          exit 1

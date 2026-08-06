@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const websiteRoot = resolve(process.argv[2] ?? join(repositoryRoot, "..", "AximeloSkillWeb"));
+const websiteRoot = resolve(process.argv[2] ?? join(repositoryRoot, "..", "aximelo", "apps", "website"));
 const outputRoot = join(websiteRoot, "public", "open", "aximelo-cli");
 const installationSource = join(repositoryRoot, "docs", "installation.md");
 const skillSource = join(repositoryRoot, "skills", "aximelo", "SKILL.md");
